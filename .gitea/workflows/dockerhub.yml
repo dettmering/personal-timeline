@@ -1,0 +1,37 @@
+name: Build and Push Docker Image
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - '*'
+
+jobs:
+  build:
+    runs-on: docker
+    steps:
+      - name: Login to DockerHub
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USER }}" --password-stdin
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build and push
+        run: |
+          IMAGE="dettmering/personal-timeline"
+          REF="${{ github.ref }}"
+
+          if echo "$REF" | grep -q "^refs/tags/"; then
+            TAG="${REF#refs/tags/}"
+          else
+            TAG="latest"
+          fi
+
+          docker build -t "${IMAGE}:${TAG}" .
+          docker push "${IMAGE}:${TAG}"
+
+          docker rmi "${IMAGE}:${TAG}"
+
+      - name: Logout
+        run: docker logout
