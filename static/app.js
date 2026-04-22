@@ -180,7 +180,7 @@
     el.dayNav.classList.remove('hidden');
     el.composer.classList.toggle('hidden', !isToday(state.date));
     el.composer.style.display = isToday(state.date) ? '' : 'none';
-    el.dayLabel.textContent = isToday(state.date) ? `Heute — ${formatDateLong(state.date)}` : formatDateLong(state.date);
+    el.dayLabel.textContent = formatDateLong(state.date);
     el.datePicker.value = state.date;
     el.datePicker.max = todayISO();
 
