@@ -13,12 +13,14 @@
   <main class="container">
     <nav class="day-nav" id="dayNav">
       <button id="prevDay" type="button" aria-label="Vorheriger Tag">&larr;</button>
-      <div class="day-label">
+      <div class="day-center">
         <span id="dayLabel">Heute</span>
-        <input type="date" id="datePicker">
+        <div class="day-controls">
+          <input type="date" id="datePicker">
+          <button id="todayBtn" type="button">Heute</button>
+        </div>
       </div>
       <button id="nextDay" type="button" aria-label="Nächster Tag">&rarr;</button>
-      <button id="todayBtn" type="button">Heute</button>
     </nav>
 
     <section class="filter-banner hidden" id="filterBanner">

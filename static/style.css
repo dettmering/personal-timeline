@@ -33,7 +33,7 @@ html, body {
   background: var(--bg);
   color: var(--text);
   font-family: "Fira Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 16px;
+  font-size: 18px;
   line-height: 1.5;
 }
 
@@ -126,29 +126,46 @@ button:disabled {
 }
 
 .day-nav {
-  display: flex;
+  display: grid;
+  grid-template-columns: 48px 1fr 48px;
   align-items: center;
-  justify-content: center;
-  gap: 10px;
-  margin-bottom: 14px;
-  flex-wrap: wrap;
+  margin-bottom: 20px;
 }
 
-.day-label {
+.day-nav > #prevDay,
+.day-nav > #nextDay {
+  font-size: 22px;
+  padding: 8px;
+  text-align: center;
+  border-color: transparent;
+  background: transparent;
+}
+
+.day-center {
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-width: 160px;
-  gap: 4px;
+  gap: 8px;
 }
 
-.day-label span {
-  font-weight: 600;
+.day-center > span {
+  font-size: 26px;
+  font-weight: 700;
+  text-align: center;
 }
 
-.day-label input[type="date"] {
+.day-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.day-controls input[type="date"],
+.day-controls #todayBtn {
   font: inherit;
-  padding: 4px 6px;
+  font-size: 14px;
+  padding: 5px 10px;
+  height: 34px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--surface);
@@ -177,7 +194,6 @@ button:disabled {
 
 .entry {
   background: var(--surface);
-  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 14px 16px;
   display: flex;
