@@ -1,0 +1,188 @@
+package main
+
+import (
+	"encoding/json"
+	"errors"
+	"io"
+	"net/http"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+)
+
+const maxTextLen = 1000
+
+type API struct {
+	Store  *Store
+	APIKey string
+}
+
+func (a *API) Register(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/entries", a.list)
+	mux.HandleFunc("POST /api/entries", a.create)
+	mux.HandleFunc("PUT /api/entries/{id}", a.update)
+	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, 200, map[string]string{"status": "ok"})
+	})
+}
+
+func (a *API) serverTZ() *time.Location {
+	tz := os.Getenv("TZ")
+	if tz == "" {
+		return time.Local
+	}
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		return time.Local
+	}
+	return loc
+}
+
+func (a *API) list(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	if tag := strings.TrimPrefix(q.Get("hashtag"), "#"); tag != "" {
+		entries, err := a.Store.ListByHashtag(tag)
+		if err != nil {
+			writeErr(w, 500, err.Error())
+			return
+		}
+		writeJSON(w, 200, map[string]any{"entries": entries, "hashtag": strings.ToLower(tag)})
+		return
+	}
+
+	tz := a.serverTZ()
+	var day time.Time
+	if d := q.Get("date"); d != "" {
+		t, err := time.ParseInLocation("2006-01-02", d, tz)
+		if err != nil {
+			writeErr(w, 400, "invalid date (expected YYYY-MM-DD)")
+			return
+		}
+		day = t
+	} else {
+		day = time.Now().In(tz)
+	}
+
+	entries, err := a.Store.ListByDay(day, tz)
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, map[string]any{
+		"date":    day.In(tz).Format("2006-01-02"),
+		"entries": entries,
+	})
+}
+
+type createReq struct {
+	Text      string `json:"text"`
+	Automated bool   `json:"automated"`
+}
+
+func (a *API) create(w http.ResponseWriter, r *http.Request) {
+	// API-Key nur für automated-Einträge erzwingen, oder pauschal wenn gesetzt und Header übergeben.
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		writeErr(w, 400, "cannot read body")
+		return
+	}
+	var req createReq
+	if err := json.Unmarshal(body, &req); err != nil {
+		writeErr(w, 400, "invalid json")
+		return
+	}
+	req.Text = strings.TrimSpace(req.Text)
+	if req.Text == "" {
+		writeErr(w, 400, "text is empty")
+		return
+	}
+	if utf8Len(req.Text) > maxTextLen {
+		writeErr(w, 400, "text exceeds 1000 characters")
+		return
+	}
+	if req.Automated && !a.checkAPIKey(r) {
+		writeErr(w, 401, "invalid or missing API key")
+		return
+	}
+
+	entry, err := a.Store.Create(req.Text, time.Now(), req.Automated)
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 201, entry)
+}
+
+type updateReq struct {
+	Text string `json:"text"`
+}
+
+func (a *API) update(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeErr(w, 400, "invalid id")
+		return
+	}
+	var req updateReq
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req); err != nil {
+		writeErr(w, 400, "invalid json")
+		return
+	}
+	req.Text = strings.TrimSpace(req.Text)
+	if req.Text == "" {
+		writeErr(w, 400, "text is empty")
+		return
+	}
+	if utf8Len(req.Text) > maxTextLen {
+		writeErr(w, 400, "text exceeds 1000 characters")
+		return
+	}
+	entry, err := a.Store.Update(id, req.Text, time.Now(), a.serverTZ())
+	if errors.Is(err, ErrNotFound) {
+		writeErr(w, 404, "entry not found")
+		return
+	}
+	if errors.Is(err, ErrNotEditable) {
+		writeErr(w, 403, "entry is not editable")
+		return
+	}
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, entry)
+}
+
+func (a *API) checkAPIKey(r *http.Request) bool {
+	if a.APIKey == "" {
+		return true
+	}
+	header := r.Header.Get("Authorization")
+	if strings.HasPrefix(header, "Bearer ") && strings.TrimPrefix(header, "Bearer ") == a.APIKey {
+		return true
+	}
+	if r.Header.Get("X-API-Key") == a.APIKey {
+		return true
+	}
+	return false
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+func writeErr(w http.ResponseWriter, status int, msg string) {
+	writeJSON(w, status, map[string]string{"error": msg})
+}
+
+func utf8Len(s string) int {
+	n := 0
+	for range s {
+		n++
+	}
+	return n
+}

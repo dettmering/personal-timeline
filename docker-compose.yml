@@ -1,0 +1,16 @@
+services:
+  timeline:
+    build: .
+    image: personal-timeline:latest
+    container_name: personal-timeline
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - timeline-data:/data
+    environment:
+      TZ: Europe/Berlin
+      # API_KEY: change-me   # optional, erzwingt Bearer/X-API-Key bei automated=true
+
+volumes:
+  timeline-data:

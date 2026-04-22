@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Personal Timeline</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>Personal Timeline</h1>
+  </header>
+
+  <main class="container">
+    <section class="composer" id="composer">
+      <textarea id="text" maxlength="1000" placeholder="Was machst du gerade? (#hashtags werden erkannt)"></textarea>
+      <div class="composer-row">
+        <span id="charCount" class="char-count">0 / 1000</span>
+        <button id="postBtn" type="button">Eintrag posten</button>
+      </div>
+    </section>
+
+    <nav class="day-nav" id="dayNav">
+      <button id="prevDay" type="button" aria-label="Vorheriger Tag">&larr;</button>
+      <div class="day-label">
+        <span id="dayLabel">Heute</span>
+        <input type="date" id="datePicker">
+      </div>
+      <button id="nextDay" type="button" aria-label="Nächster Tag">&rarr;</button>
+      <button id="todayBtn" type="button">Heute</button>
+    </nav>
+
+    <section class="filter-banner hidden" id="filterBanner">
+      <span>Gefiltert nach <strong id="filterTag"></strong></span>
+      <button id="clearFilter" type="button">Filter entfernen</button>
+    </section>
+
+    <section class="timeline" id="timeline"></section>
+    <p class="empty hidden" id="emptyState">Keine Einträge an diesem Tag.</p>
+  </main>
+
+  <dialog id="editDialog">
+    <form id="editForm" method="dialog">
+      <h2>Eintrag bearbeiten</h2>
+      <textarea id="editText" maxlength="1000"></textarea>
+      <div class="composer-row">
+        <span id="editCharCount" class="char-count">0 / 1000</span>
+        <div class="dialog-buttons">
+          <button value="cancel" type="submit">Abbrechen</button>
+          <button value="save" type="submit" class="primary">Speichern</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
