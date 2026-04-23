@@ -15,6 +15,7 @@ func main() {
 	dbPath := getenv("DB_PATH", "/data/timeline.db")
 	addr := getenv("LISTEN_ADDR", ":8080")
 	apiKey := os.Getenv("API_KEY")
+	webhookURL := os.Getenv("WEBHOOK_URL")
 
 	store, err := OpenStore(dbPath)
 	if err != nil {
@@ -24,7 +25,7 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	api := &API{Store: store, APIKey: apiKey}
+	api := &API{Store: store, APIKey: apiKey, WebhookURL: webhookURL}
 	api.Register(mux)
 
 	sub, err := fs.Sub(staticFiles, "static")

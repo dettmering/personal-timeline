@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -14,8 +16,9 @@ import (
 const maxTextLen = 1000
 
 type API struct {
-	Store  *Store
-	APIKey string
+	Store      *Store
+	APIKey     string
+	WebhookURL string
 }
 
 func (a *API) Register(mux *http.ServeMux) {
@@ -111,7 +114,37 @@ func (a *API) create(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
+	a.fireWebhook(entry)
 	writeJSON(w, 201, entry)
+}
+
+func (a *API) fireWebhook(entry *Entry) {
+	if a.WebhookURL == "" {
+		return
+	}
+	payload, err := json.Marshal(entry)
+	if err != nil {
+		log.Printf("webhook marshal: %v", err)
+		return
+	}
+	go func() {
+		client := &http.Client{Timeout: 10 * time.Second}
+		req, err := http.NewRequest("POST", a.WebhookURL, bytes.NewReader(payload))
+		if err != nil {
+			log.Printf("webhook request: %v", err)
+			return
+		}
+		req.Header.Set("Content-Type", "application/json; charset=utf-8")
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Printf("webhook post: %v", err)
+			return
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode >= 300 {
+			log.Printf("webhook non-2xx status: %s", resp.Status)
+		}
+	}()
 }
 
 type updateReq struct {
