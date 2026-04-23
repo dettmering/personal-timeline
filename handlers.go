@@ -25,6 +25,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/entries", a.list)
 	mux.HandleFunc("POST /api/entries", a.create)
 	mux.HandleFunc("PUT /api/entries/{id}", a.update)
+	mux.HandleFunc("DELETE /api/entries/{id}", a.delete)
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]string{"status": "ok"})
 	})
@@ -186,6 +187,29 @@ func (a *API) update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, entry)
+}
+
+func (a *API) delete(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeErr(w, 400, "invalid id")
+		return
+	}
+	err = a.Store.Delete(id, time.Now(), a.serverTZ())
+	if errors.Is(err, ErrNotFound) {
+		writeErr(w, 404, "entry not found")
+		return
+	}
+	if errors.Is(err, ErrNotDeletable) {
+		writeErr(w, 403, "entry is not deletable")
+		return
+	}
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	w.WriteHeader(204)
 }
 
 func (a *API) checkAPIKey(r *http.Request) bool {

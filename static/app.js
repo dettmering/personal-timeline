@@ -166,6 +166,12 @@
         editBtn.textContent = 'Bearbeiten';
         editBtn.addEventListener('click', () => openEdit(entry));
         actions.appendChild(editBtn);
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.textContent = 'Löschen';
+        delBtn.className = 'danger';
+        delBtn.addEventListener('click', () => deleteEntry(entry.id));
+        actions.appendChild(delBtn);
         div.appendChild(actions);
       }
 
@@ -231,6 +237,20 @@
       alert('Fehler: ' + err.message);
     } finally {
       el.postBtn.disabled = false;
+    }
+  }
+
+  async function deleteEntry(id) {
+    if (!confirm('Eintrag wirklich löschen?')) return;
+    try {
+      await api(`/api/entries/${id}`, { method: 'DELETE' });
+      if (state.view === 'hashtag') {
+        await loadHashtag(state.hashtag);
+      } else {
+        await loadDay();
+      }
+    } catch (err) {
+      alert('Fehler: ' + err.message);
     }
   }
 

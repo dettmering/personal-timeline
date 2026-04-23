@@ -275,6 +275,10 @@ button:disabled {
   color: var(--text);
 }
 
+.entry-actions button.danger:hover {
+  color: var(--danger);
+}
+
 .empty {
   text-align: center;
   color: var(--muted);

@@ -32,6 +32,7 @@ type Store struct {
 
 var ErrNotFound = errors.New("not found")
 var ErrNotEditable = errors.New("entry not editable")
+var ErrNotDeletable = errors.New("entry not deletable")
 
 var hashtagRe = regexp.MustCompile(`#([\p{L}\p{N}_]+)`)
 
@@ -210,6 +211,30 @@ func (s *Store) Update(id int64, text string, now time.Time, serverTZ *time.Loca
 		Automated: automated != 0,
 		Hashtags:  tags,
 	}, nil
+}
+
+func (s *Store) Delete(id int64, now time.Time, serverTZ *time.Location) error {
+	var createdStr string
+	var automated int
+	err := s.db.QueryRow(`SELECT created_at, automated FROM entries WHERE id = ?`, id).Scan(&createdStr, &automated)
+	if err == sql.ErrNoRows {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if automated != 0 {
+		return ErrNotDeletable
+	}
+	createdAt, err := time.Parse(time.RFC3339Nano, createdStr)
+	if err != nil {
+		return err
+	}
+	if !sameDay(createdAt.In(serverTZ), now.In(serverTZ)) {
+		return ErrNotDeletable
+	}
+	_, err = s.db.Exec(`DELETE FROM entries WHERE id = ?`, id)
+	return err
 }
 
 // ListByDay returns entries whose created_at falls within the given calendar day in tz.
