@@ -13,6 +13,11 @@ Es soll eine Microsite entwickelt werden, die es mir erlaubt, ein Logbuch über 
 - Es soll die Möglichkeit bestehen, per API Einträge hinzuzufügen.
 - Es soll in dieser API einen Flag für automatisierte Einträge geben. Wenn dieses gesetzt wird, soll der Eintrag kleiner und in grau dargestellt sein. Es soll dann KEINE Möglichkeit zum Editieren geben.
 - Es soll per Env-Var (`WEBHOOK_URL`) ein Webhook-Ziel konfigurierbar sein. Bei jedem neu angelegten Eintrag wird eine HTTP-POST-Anfrage an diese URL gesendet, mit dem gleichen JSON-Payload, der auch als API-Antwort zurückkommt.
+- Vergangene Tage sollen fälschungssicher (tamper-evident) sein: Sobald ein Kalendertag abgeschlossen ist, wird er kryptographisch versiegelt. Jede nachträgliche Änderung oder Löschung eines Eintrags an einem versiegelten Tag muss bei einer Verifikation erkennbar sein.
+- Die Versiegelung aller Tage soll als Kette organisiert sein, so dass jeder Siegel-Hash den vorherigen einschließt. Dadurch wird jede Manipulation nicht nur am betroffenen Tag, sondern auch in allen nachfolgenden Tagen sichtbar.
+- Der Siegel-Hash eines jeden Tages soll bei einem externen Zeitstempel-Dienst (OpenTimestamps) hinterlegt werden, so dass unabhängig vom Server belegt werden kann, dass der Siegel-Hash zu einem bestimmten Zeitpunkt existierte. Der resultierende `.ots`-Proof muss exportierbar sein.
+- Es soll einen Endpoint zur Verifikation der gesamten Kette geben, der den ersten Bruch samt Grund (Eintrag manipuliert, Eintrag entfernt, Merkle-Root inkonsistent, Chain-Bruch) meldet.
+- Im Frontend soll an vergangenen Tagen ein Hinweis auf die Versiegelung sichtbar sein, über den die Siegel-Details und der `.ots`-Proof heruntergeladen werden können.
 
 # Technische Anforderungen
 
