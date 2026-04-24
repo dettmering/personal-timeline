@@ -344,6 +344,61 @@ button:disabled {
   color: #faf9f5;
 }
 
+.seal-badge {
+  margin-left: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 0.9em;
+  color: var(--muted);
+  opacity: 0.7;
+  line-height: 1;
+  vertical-align: middle;
+}
+.seal-badge:hover { opacity: 1; color: var(--primary); }
+.seal-badge.hidden { display: none; }
+
+.seal-dialog {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  padding: 20px;
+  max-width: 480px;
+  width: calc(100% - 32px);
+}
+.seal-dialog::backdrop { background: rgba(0, 0, 0, 0.4); }
+.seal-dialog h2 { margin: 0 0 12px; font-family: var(--font-serif); }
+.seal-details {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 14px;
+  margin: 0 0 16px;
+}
+.seal-details dt { color: var(--muted); font-size: 0.9em; }
+.seal-details dd { margin: 0; }
+.seal-details code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8em;
+  word-break: break-all;
+  background: var(--surface);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.seal-dialog .dialog-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  align-items: center;
+}
+.seal-dialog .dialog-buttons a {
+  color: var(--primary);
+  text-decoration: none;
+  font-size: 0.9em;
+}
+.seal-dialog .dialog-buttons a:hover { text-decoration: underline; }
+
 @media (max-width: 480px) {
   .container { padding: 16px 10px 60px; }
   .composer, .entry { border-radius: 10px; }

@@ -15,6 +15,7 @@
       <button id="prevDay" type="button" aria-label="Vorheriger Tag">&larr;</button>
       <div class="day-center">
         <span id="dayLabel">Heute</span>
+        <button id="sealBadge" type="button" class="seal-badge hidden" title="Tag ist versiegelt" aria-label="Details zur Versiegelung anzeigen">&#128274;</button>
         <div class="day-controls">
           <input type="date" id="datePicker">
           <button id="todayBtn" type="button">Heute</button>
@@ -39,6 +40,23 @@
     <section class="timeline" id="timeline"></section>
     <p class="empty hidden" id="emptyState">Keine Einträge an diesem Tag.</p>
   </main>
+
+  <dialog id="sealDialog" class="seal-dialog">
+    <form method="dialog">
+      <h2>Tagesversiegelung</h2>
+      <dl class="seal-details">
+        <dt>Datum</dt><dd id="sealDate"></dd>
+        <dt>Einträge</dt><dd id="sealCount"></dd>
+        <dt>Versiegelt am</dt><dd id="sealedAt"></dd>
+        <dt>Seal-Hash</dt><dd><code id="sealHash"></code></dd>
+        <dt>Zeitstempel</dt><dd id="sealOTS"></dd>
+      </dl>
+      <div class="dialog-buttons">
+        <a id="sealProofLink" href="#" download>Proof herunterladen (.ots)</a>
+        <button value="close" type="submit" class="primary">Schließen</button>
+      </div>
+    </form>
+  </dialog>
 
   <dialog id="editDialog">
     <form id="editForm" method="dialog">

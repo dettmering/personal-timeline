@@ -25,10 +25,19 @@
     editForm: document.getElementById('editForm'),
     editText: document.getElementById('editText'),
     editCharCount: document.getElementById('editCharCount'),
+    sealBadge: document.getElementById('sealBadge'),
+    sealDialog: document.getElementById('sealDialog'),
+    sealDate: document.getElementById('sealDate'),
+    sealCount: document.getElementById('sealCount'),
+    sealedAt: document.getElementById('sealedAt'),
+    sealHash: document.getElementById('sealHash'),
+    sealOTS: document.getElementById('sealOTS'),
+    sealProofLink: document.getElementById('sealProofLink'),
   };
 
   let editingId = null;
   let knownHashtags = [];
+  let currentSeal = null;
 
   async function refreshHashtags() {
     try {
@@ -308,6 +317,46 @@
     } catch (err) {
       alert('Fehler beim Laden: ' + err.message);
     }
+    await updateSealBadge();
+  }
+
+  async function updateSealBadge() {
+    if (state.view !== 'day' || isToday(state.date)) {
+      el.sealBadge.classList.add('hidden');
+      currentSeal = null;
+      return;
+    }
+    try {
+      currentSeal = await api(`/api/seals/${encodeURIComponent(state.date)}`);
+      el.sealBadge.classList.remove('hidden');
+    } catch (err) {
+      el.sealBadge.classList.add('hidden');
+      currentSeal = null;
+    }
+  }
+
+  function showSealDialog() {
+    if (!currentSeal) return;
+    el.sealDate.textContent = currentSeal.date;
+    el.sealCount.textContent = String(currentSeal.entry_count);
+    el.sealedAt.textContent = formatDateTime(currentSeal.sealed_at);
+    el.sealHash.textContent = currentSeal.seal_hash;
+    if (currentSeal.ots_upgraded_at) {
+      el.sealOTS.textContent =
+        'Bitcoin-bestätigt (' + formatDateTime(currentSeal.ots_upgraded_at) + ')';
+    } else if (currentSeal.has_ots_proof) {
+      el.sealOTS.textContent =
+        'Bei OpenTimestamps eingereicht, wartet auf Bitcoin-Bestätigung';
+    } else {
+      el.sealOTS.textContent = 'Kein externer Zeitstempel vorhanden';
+    }
+    if (currentSeal.has_ots_proof) {
+      el.sealProofLink.href = `/api/seals/${encodeURIComponent(currentSeal.date)}/proof.ots`;
+      el.sealProofLink.style.display = '';
+    } else {
+      el.sealProofLink.style.display = 'none';
+    }
+    el.sealDialog.showModal();
   }
 
   async function loadHashtag(tag) {
@@ -443,6 +492,8 @@
     const tag = a.dataset.tag;
     loadHashtag(tag);
   });
+
+  el.sealBadge.addEventListener('click', showSealDialog);
 
   el.editForm.addEventListener('submit', (e) => {
     const val = e.submitter && e.submitter.value;
