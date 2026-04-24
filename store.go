@@ -381,6 +381,26 @@ func (s *Store) attachHashtags(entries []*Entry) ([]*Entry, error) {
 	return entries, rows.Err()
 }
 
+func (s *Store) ListAllHashtags() ([]string, error) {
+	rows, err := s.db.Query(
+		`SELECT tag, COUNT(*) AS cnt FROM hashtags GROUP BY tag ORDER BY cnt DESC, tag ASC`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	tags := []string{}
+	for rows.Next() {
+		var tag string
+		var cnt int
+		if err := rows.Scan(&tag, &cnt); err != nil {
+			return nil, err
+		}
+		tags = append(tags, tag)
+	}
+	return tags, rows.Err()
+}
+
 func (s *Store) hashtagsFor(id int64) ([]string, error) {
 	rows, err := s.db.Query(`SELECT tag FROM hashtags WHERE entry_id = ? ORDER BY tag`, id)
 	if err != nil {

@@ -308,6 +308,42 @@ button:disabled {
   gap: 8px;
 }
 
+.hashtag-autocomplete-wrap {
+  position: relative;
+}
+
+.hashtag-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-width: 180px;
+  max-height: 240px;
+  overflow-y: auto;
+  z-index: 10;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+  padding: 4px;
+}
+
+.hashtag-suggestions.hidden { display: none; }
+
+.hashtag-suggestion {
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.hashtag-suggestion.selected {
+  background: var(--primary);
+  color: #faf9f5;
+}
+
 @media (max-width: 480px) {
   .container { padding: 16px 10px 60px; }
   .composer, .entry { border-radius: 10px; }
