@@ -28,6 +28,118 @@
   };
 
   let editingId = null;
+  let knownHashtags = [];
+
+  async function refreshHashtags() {
+    try {
+      const data = await api('/api/hashtags');
+      knownHashtags = data.hashtags || [];
+    } catch (err) {
+      // non-critical
+    }
+  }
+
+  function attachHashtagAutocomplete(textarea) {
+    const wrap = document.createElement('div');
+    wrap.className = 'hashtag-autocomplete-wrap';
+    textarea.parentNode.insertBefore(wrap, textarea);
+    wrap.appendChild(textarea);
+
+    const box = document.createElement('div');
+    box.className = 'hashtag-suggestions hidden';
+    wrap.appendChild(box);
+
+    const state = { active: false, matches: [], selected: 0, start: -1 };
+
+    function tokenAtCaret() {
+      const caret = textarea.selectionStart;
+      if (caret !== textarea.selectionEnd) return null;
+      const before = textarea.value.slice(0, caret);
+      const m = before.match(/#([\p{L}\p{N}_]*)$/u);
+      if (!m) return null;
+      const ch = before.charAt(before.length - m[0].length - 1);
+      if (ch && /[\p{L}\p{N}_]/u.test(ch)) return null;
+      return { start: caret - m[0].length, prefix: m[1].toLowerCase() };
+    }
+
+    function render() {
+      box.innerHTML = '';
+      state.matches.forEach((tag, i) => {
+        const item = document.createElement('div');
+        item.className = 'hashtag-suggestion' + (i === state.selected ? ' selected' : '');
+        item.textContent = '#' + tag;
+        item.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          commit(tag);
+        });
+        box.appendChild(item);
+      });
+      box.classList.remove('hidden');
+    }
+
+    function close() {
+      state.active = false;
+      state.matches = [];
+      state.selected = 0;
+      state.start = -1;
+      box.classList.add('hidden');
+    }
+
+    function update() {
+      const tok = tokenAtCaret();
+      if (!tok) return close();
+      const matches = knownHashtags
+        .filter((t) => t.startsWith(tok.prefix) && t !== tok.prefix)
+        .slice(0, 8);
+      if (matches.length === 0) return close();
+      state.active = true;
+      state.matches = matches;
+      state.start = tok.start;
+      if (state.selected >= matches.length) state.selected = 0;
+      render();
+    }
+
+    function commit(tag) {
+      const caret = textarea.selectionStart;
+      const before = textarea.value.slice(0, state.start);
+      const after = textarea.value.slice(caret);
+      const insert = '#' + tag + ' ';
+      textarea.value = before + insert + after;
+      const pos = before.length + insert.length;
+      textarea.setSelectionRange(pos, pos);
+      textarea.dispatchEvent(new Event('input'));
+      close();
+    }
+
+    textarea.addEventListener('input', update);
+    textarea.addEventListener('click', update);
+    textarea.addEventListener('keyup', (e) => {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' ||
+          e.key === 'Home' || e.key === 'End') {
+        update();
+      }
+    });
+    textarea.addEventListener('blur', () => setTimeout(close, 120));
+    textarea.addEventListener('keydown', (e) => {
+      if (!state.active) return;
+      if (e.key === 'Tab' ||
+          (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey)) {
+        e.preventDefault();
+        commit(state.matches[state.selected]);
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        state.selected = (state.selected + 1) % state.matches.length;
+        render();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        state.selected = (state.selected - 1 + state.matches.length) % state.matches.length;
+        render();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        close();
+      }
+    });
+  }
 
   function todayISO() {
     const d = new Date();
@@ -233,6 +345,7 @@
         state.date = todayISO();
       }
       await loadDay();
+      refreshHashtags();
     } catch (err) {
       alert('Fehler: ' + err.message);
     } finally {
@@ -280,6 +393,7 @@
       } else {
         await loadDay();
       }
+      refreshHashtags();
     } catch (err) {
       alert('Fehler: ' + err.message);
     }
@@ -340,6 +454,10 @@
     }
   });
 
+  attachHashtagAutocomplete(el.text);
+  attachHashtagAutocomplete(el.editText);
+
   // Initial load
+  refreshHashtags();
   loadDay();
 })();

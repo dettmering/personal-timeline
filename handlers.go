@@ -26,9 +26,19 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/entries", a.create)
 	mux.HandleFunc("PUT /api/entries/{id}", a.update)
 	mux.HandleFunc("DELETE /api/entries/{id}", a.delete)
+	mux.HandleFunc("GET /api/hashtags", a.hashtags)
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]string{"status": "ok"})
 	})
+}
+
+func (a *API) hashtags(w http.ResponseWriter, r *http.Request) {
+	tags, err := a.Store.ListAllHashtags()
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, map[string]any{"hashtags": tags})
 }
 
 func (a *API) serverTZ() *time.Location {
