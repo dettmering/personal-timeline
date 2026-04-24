@@ -8,15 +8,17 @@ Personal Timeline is a day-logging microsite (similar to Twitter/microblog) for 
 
 ## Development Commands
 
-```bash
-# Run locally
-DB_PATH=/tmp/timeline.db LISTEN_ADDR=:8080 go run ./
+**Go is not installed on the host.** Always use Docker for compilation and running:
 
-# Build binary
-CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o timeline ./
+```bash
+# Compile check (no go toolchain on host)
+docker run --rm -v $(pwd):/src -w /src golang:1.22-alpine go build ./...
+
+# Build production binary
+docker build -t personal-timeline .
 
 # Run with Docker Compose
-docker-compose up --build
+docker compose up --build
 ```
 
 No test suite or linter is configured.

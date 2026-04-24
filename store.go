@@ -330,6 +330,26 @@ func (s *Store) ListByDay(day time.Time, tz *time.Location) ([]*Entry, error) {
 	return s.attachHashtags(entries)
 }
 
+// ListByRange returns entries whose created_at falls within [from, to] (inclusive, calendar days in tz).
+func (s *Store) ListByRange(from, to time.Time, tz *time.Location) ([]*Entry, error) {
+	start := time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, tz)
+	end := time.Date(to.Year(), to.Month(), to.Day(), 0, 0, 0, 0, tz).Add(24 * time.Hour)
+	rows, err := s.db.Query(
+		`SELECT id, text, created_at, edited_at, automated FROM entries
+		 WHERE created_at >= ? AND created_at < ?
+		 ORDER BY created_at DESC`,
+		start.UTC().Format(time.RFC3339Nano), end.UTC().Format(time.RFC3339Nano),
+	)
+	if err != nil {
+		return nil, err
+	}
+	entries, err := scanEntries(rows)
+	if err != nil {
+		return nil, err
+	}
+	return s.attachHashtags(entries)
+}
+
 func (s *Store) ListByHashtag(tag string) ([]*Entry, error) {
 	rows, err := s.db.Query(
 		`SELECT e.id, e.text, e.created_at, e.edited_at, e.automated

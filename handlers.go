@@ -76,6 +76,39 @@ func (a *API) list(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tz := a.serverTZ()
+
+	if fromStr, toStr := q.Get("from"), q.Get("to"); fromStr != "" || toStr != "" {
+		if fromStr == "" || toStr == "" {
+			writeErr(w, 400, "both 'from' and 'to' are required for range queries")
+			return
+		}
+		from, err := time.ParseInLocation("2006-01-02", fromStr, tz)
+		if err != nil {
+			writeErr(w, 400, "invalid 'from' date (expected YYYY-MM-DD)")
+			return
+		}
+		to, err := time.ParseInLocation("2006-01-02", toStr, tz)
+		if err != nil {
+			writeErr(w, 400, "invalid 'to' date (expected YYYY-MM-DD)")
+			return
+		}
+		if to.Before(from) {
+			writeErr(w, 400, "'to' must not be before 'from'")
+			return
+		}
+		entries, err := a.Store.ListByRange(from, to, tz)
+		if err != nil {
+			writeErr(w, 500, err.Error())
+			return
+		}
+		writeJSON(w, 200, map[string]any{
+			"from":    fromStr,
+			"to":      toStr,
+			"entries": entries,
+		})
+		return
+	}
+
 	var day time.Time
 	if d := q.Get("date"); d != "" {
 		t, err := time.ParseInLocation("2006-01-02", d, tz)
