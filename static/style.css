@@ -345,18 +345,23 @@ button:disabled {
 }
 
 .seal-badge {
-  margin-left: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: none;
   cursor: pointer;
-  padding: 2px 4px;
-  font-size: 0.9em;
+  padding: 0;
+  width: 28px;
+  height: 28px;
   color: var(--muted);
-  opacity: 0.7;
-  line-height: 1;
-  vertical-align: middle;
+  opacity: 0.8;
+  transition: color 0.15s ease, opacity 0.15s ease;
 }
-.seal-badge:hover { opacity: 1; color: var(--primary); }
+.seal-badge:hover { opacity: 1; color: var(--text); }
+.seal-badge.broken { color: var(--danger); opacity: 1; }
+.seal-badge.broken:hover { color: var(--danger); }
+.seal-badge svg { display: block; }
 .seal-badge.hidden { display: none; }
 
 .seal-dialog {
@@ -378,6 +383,8 @@ button:disabled {
 }
 .seal-details dt { color: var(--muted); font-size: 0.9em; }
 .seal-details dd { margin: 0; }
+.seal-details dd.status-ok { color: var(--muted); }
+.seal-details dd.status-broken { color: var(--danger); font-weight: 600; }
 .seal-details code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.8em;

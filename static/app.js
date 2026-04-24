@@ -27,6 +27,7 @@
     editCharCount: document.getElementById('editCharCount'),
     sealBadge: document.getElementById('sealBadge'),
     sealDialog: document.getElementById('sealDialog'),
+    sealStatus: document.getElementById('sealStatus'),
     sealDate: document.getElementById('sealDate'),
     sealCount: document.getElementById('sealCount'),
     sealedAt: document.getElementById('sealedAt'),
@@ -38,6 +39,25 @@
   let editingId = null;
   let knownHashtags = [];
   let currentSeal = null;
+  let verifyStatus = null;
+
+  async function refreshVerifyStatus() {
+    try {
+      verifyStatus = await api('/api/verify');
+    } catch (err) {
+      verifyStatus = null;
+    }
+  }
+
+  // dayIsBroken returns true if the chain is broken at or before `date`.
+  // We return true for any date >= first_broken_day because VerifyChain stops
+  // at the first mismatch and later days are no longer verifiable as part of a
+  // consistent chain.
+  function dayIsBroken(date) {
+    if (!verifyStatus || verifyStatus.chain_ok) return false;
+    if (!verifyStatus.first_broken_day) return false;
+    return date >= verifyStatus.first_broken_day;
+  }
 
   async function refreshHashtags() {
     try {
@@ -320,6 +340,23 @@
     await updateSealBadge();
   }
 
+  const ICON_LOCK =
+    '<svg viewBox="0 0 24 24" width="18" height="18" fill="none"' +
+    ' stroke="currentColor" stroke-width="1.25" stroke-linecap="round"' +
+    ' stroke-linejoin="round" aria-hidden="true">' +
+    '<rect x="5.5" y="10.5" width="13" height="10" rx="2"/>' +
+    '<path d="M8.5 10.5V7.25a3.5 3.5 0 0 1 7 0v3.25"/>' +
+    '</svg>';
+
+  const ICON_WARN =
+    '<svg viewBox="0 0 24 24" width="18" height="18" fill="none"' +
+    ' stroke="currentColor" stroke-width="1.25" stroke-linecap="round"' +
+    ' stroke-linejoin="round" aria-hidden="true">' +
+    '<path d="M12 3.5L21.5 20.5H2.5L12 3.5z"/>' +
+    '<line x1="12" y1="10" x2="12" y2="14.5"/>' +
+    '<circle cx="12" cy="17.5" r="0.6" fill="currentColor" stroke="none"/>' +
+    '</svg>';
+
   async function updateSealBadge() {
     if (state.view !== 'day' || isToday(state.date)) {
       el.sealBadge.classList.add('hidden');
@@ -329,6 +366,15 @@
     try {
       currentSeal = await api(`/api/seals/${encodeURIComponent(state.date)}`);
       el.sealBadge.classList.remove('hidden');
+      const broken = dayIsBroken(state.date);
+      el.sealBadge.classList.toggle('broken', broken);
+      if (broken) {
+        el.sealBadge.innerHTML = ICON_WARN;
+        el.sealBadge.title = 'Chain gebrochen — Manipulation erkannt';
+      } else {
+        el.sealBadge.innerHTML = ICON_LOCK;
+        el.sealBadge.title = 'Tag ist versiegelt';
+      }
     } catch (err) {
       el.sealBadge.classList.add('hidden');
       currentSeal = null;
@@ -337,6 +383,20 @@
 
   function showSealDialog() {
     if (!currentSeal) return;
+    const broken = dayIsBroken(currentSeal.date);
+    el.sealStatus.classList.toggle('status-broken', broken);
+    el.sealStatus.classList.toggle('status-ok', !broken);
+    if (!broken) {
+      el.sealStatus.textContent = 'Kette intakt';
+    } else if (verifyStatus && currentSeal.date === verifyStatus.first_broken_day) {
+      el.sealStatus.textContent =
+        'Manipulation erkannt: ' + (verifyStatus.break_reason || 'unbekannte Abweichung');
+    } else if (verifyStatus) {
+      el.sealStatus.textContent =
+        'Kette bereits ab ' + verifyStatus.first_broken_day + ' gebrochen — dieser Tag ist nicht mehr verifizierbar';
+    } else {
+      el.sealStatus.textContent = 'Status unbekannt';
+    }
     el.sealDate.textContent = currentSeal.date;
     el.sealCount.textContent = String(currentSeal.entry_count);
     el.sealedAt.textContent = formatDateTime(currentSeal.sealed_at);
@@ -510,5 +570,5 @@
 
   // Initial load
   refreshHashtags();
-  loadDay();
+  refreshVerifyStatus().then(() => loadDay());
 })();

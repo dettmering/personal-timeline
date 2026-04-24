@@ -15,8 +15,8 @@
       <button id="prevDay" type="button" aria-label="Vorheriger Tag">&larr;</button>
       <div class="day-center">
         <span id="dayLabel">Heute</span>
-        <button id="sealBadge" type="button" class="seal-badge hidden" title="Tag ist versiegelt" aria-label="Details zur Versiegelung anzeigen">&#128274;</button>
         <div class="day-controls">
+          <button id="sealBadge" type="button" class="seal-badge hidden" title="Tag ist versiegelt" aria-label="Details zur Versiegelung anzeigen"></button>
           <input type="date" id="datePicker">
           <button id="todayBtn" type="button">Heute</button>
         </div>
@@ -45,6 +45,7 @@
     <form method="dialog">
       <h2>Tagesversiegelung</h2>
       <dl class="seal-details">
+        <dt>Status</dt><dd id="sealStatus"></dd>
         <dt>Datum</dt><dd id="sealDate"></dd>
         <dt>Einträge</dt><dd id="sealCount"></dd>
         <dt>Versiegelt am</dt><dd id="sealedAt"></dd>
