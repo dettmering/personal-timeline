@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -19,6 +20,7 @@ type API struct {
 	Store      *Store
 	APIKey     string
 	WebhookURL string
+	TZ         *time.Location
 }
 
 func (a *API) Register(mux *http.ServeMux) {
@@ -29,9 +31,17 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]string{"status": "ok"})
 	})
+	mux.HandleFunc("GET /api/verify", a.verify)
+	mux.HandleFunc("GET /api/seals", a.listSeals)
+	mux.HandleFunc("GET /api/seals/{date}", a.getSeal)
+	mux.HandleFunc("GET /api/seals/{date}/proof.ots", a.getSealProof)
+	mux.HandleFunc("POST /api/seals/{date}", a.triggerSeal)
 }
 
 func (a *API) serverTZ() *time.Location {
+	if a.TZ != nil {
+		return a.TZ
+	}
 	tz := os.Getenv("TZ")
 	if tz == "" {
 		return time.Local
@@ -242,4 +252,120 @@ func utf8Len(s string) int {
 		n++
 	}
 	return n
+}
+
+var dateRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+
+func validDate(s string) bool { return dateRe.MatchString(s) }
+
+func (a *API) verify(w http.ResponseWriter, r *http.Request) {
+	res, err := a.Store.VerifyChain()
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, res)
+}
+
+func (a *API) listSeals(w http.ResponseWriter, r *http.Request) {
+	seals, err := a.Store.ListSeals()
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	if seals == nil {
+		seals = []*DaySeal{}
+	}
+	writeJSON(w, 200, map[string]any{"seals": seals})
+}
+
+func (a *API) getSeal(w http.ResponseWriter, r *http.Request) {
+	date := r.PathValue("date")
+	if !validDate(date) {
+		writeErr(w, 400, "invalid date (expected YYYY-MM-DD)")
+		return
+	}
+	ds, err := a.Store.GetSeal(date)
+	if errors.Is(err, ErrNotFound) {
+		writeErr(w, 404, "seal not found")
+		return
+	}
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, ds)
+}
+
+func (a *API) getSealProof(w http.ResponseWriter, r *http.Request) {
+	date := r.PathValue("date")
+	if !validDate(date) {
+		writeErr(w, 400, "invalid date (expected YYYY-MM-DD)")
+		return
+	}
+	proof, err := a.Store.GetOTSProof(date)
+	if errors.Is(err, ErrNotFound) {
+		writeErr(w, 404, "seal not found")
+		return
+	}
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	if proof == nil {
+		writeErr(w, 404, "ots proof not yet available")
+		return
+	}
+	w.Header().Set("Content-Type", "application/vnd.opentimestamps.ots")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+date+`.ots"`)
+	_, _ = w.Write(proof)
+}
+
+func (a *API) triggerSeal(w http.ResponseWriter, r *http.Request) {
+	if !a.checkAPIKey(r) {
+		writeErr(w, 401, "invalid or missing API key")
+		return
+	}
+	date := r.PathValue("date")
+	if !validDate(date) {
+		writeErr(w, 400, "invalid date (expected YYYY-MM-DD)")
+		return
+	}
+	tz := a.serverTZ()
+	d, err := time.ParseInLocation("2006-01-02", date, tz)
+	if err != nil {
+		writeErr(w, 400, "invalid date")
+		return
+	}
+	today := time.Now().In(tz)
+	todayStart := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, tz)
+	if !d.Before(todayStart) {
+		writeErr(w, 400, "can only seal past days")
+		return
+	}
+	ds, created, err := a.Store.SealDay(date)
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	if created {
+		go a.submitOTS(date, ds.SealHash)
+	}
+	status := 200
+	if created {
+		status = 201
+	}
+	writeJSON(w, status, map[string]any{"seal": ds, "created": created})
+}
+
+// submitOTS is called async after a new seal is written. Failures are logged.
+func (a *API) submitOTS(date string, sealHash []byte) {
+	proof, err := SubmitOTS(sealHash)
+	if err != nil {
+		log.Printf("ots submit %s: %v", date, err)
+		return
+	}
+	if err := a.Store.SetOTSProof(date, proof); err != nil {
+		log.Printf("ots store %s: %v", date, err)
+	}
 }

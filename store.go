@@ -28,6 +28,7 @@ type Entry struct {
 
 type Store struct {
 	db *sql.DB
+	tz *time.Location
 }
 
 var ErrNotFound = errors.New("not found")
@@ -36,7 +37,10 @@ var ErrNotDeletable = errors.New("entry not deletable")
 
 var hashtagRe = regexp.MustCompile(`#([\p{L}\p{N}_]+)`)
 
-func OpenStore(path string) (*Store, error) {
+func OpenStore(path string, tz *time.Location) (*Store, error) {
+	if tz == nil {
+		tz = time.Local
+	}
 	if dir := filepath.Dir(path); dir != "" && dir != "." {
 		_ = ensureDir(dir)
 	}
@@ -45,17 +49,19 @@ func OpenStore(path string) (*Store, error) {
 		return nil, err
 	}
 	db.SetMaxOpenConns(1)
-	s := &Store{db: db}
+	s := &Store{db: db, tz: tz}
 	if err := s.migrate(); err != nil {
 		return nil, err
 	}
 	return s, nil
 }
 
+func (s *Store) TZ() *time.Location { return s.tz }
+
 func (s *Store) Close() error { return s.db.Close() }
 
 func (s *Store) migrate() error {
-	_, err := s.db.Exec(`
+	if _, err := s.db.Exec(`
 CREATE TABLE IF NOT EXISTS entries (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     text       TEXT NOT NULL,
@@ -72,8 +78,69 @@ CREATE TABLE IF NOT EXISTS hashtags (
     FOREIGN KEY(entry_id) REFERENCES entries(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_hashtags_tag ON hashtags(tag);
-`)
-	return err
+
+CREATE TABLE IF NOT EXISTS day_seals (
+    date             TEXT PRIMARY KEY,
+    entry_count      INTEGER NOT NULL,
+    merkle_root      BLOB NOT NULL,
+    prev_seal_hash   BLOB,
+    seal_hash        BLOB NOT NULL,
+    sealed_at        TEXT NOT NULL,
+    ots_proof        BLOB,
+    ots_upgraded_at  TEXT
+);
+`); err != nil {
+		return err
+	}
+	// Idempotent column add for entry_hash.
+	if _, err := s.db.Exec(`ALTER TABLE entries ADD COLUMN entry_hash BLOB`); err != nil {
+		if !strings.Contains(err.Error(), "duplicate column") {
+			return err
+		}
+	}
+	return nil
+}
+
+// BackfillHashes computes entry_hash for any rows where it's NULL.
+// Returns the number of rows updated.
+func (s *Store) BackfillHashes() (int, error) {
+	rows, err := s.db.Query(
+		`SELECT id, text, created_at, automated FROM entries WHERE entry_hash IS NULL`,
+	)
+	if err != nil {
+		return 0, err
+	}
+	type pending struct {
+		id   int64
+		hash []byte
+	}
+	var pendings []pending
+	for rows.Next() {
+		var (
+			id         int64
+			text       string
+			createdStr string
+			automated  int
+		)
+		if err := rows.Scan(&id, &text, &createdStr, &automated); err != nil {
+			rows.Close()
+			return 0, err
+		}
+		created, err := time.Parse(time.RFC3339Nano, createdStr)
+		if err != nil {
+			rows.Close()
+			return 0, err
+		}
+		e := &Entry{ID: id, Text: text, CreatedAt: created, Automated: automated != 0}
+		pendings = append(pendings, pending{id: id, hash: EntryHash(e, s.tz)})
+	}
+	rows.Close()
+	for _, p := range pendings {
+		if _, err := s.db.Exec(`UPDATE entries SET entry_hash = ? WHERE id = ?`, p.hash, p.id); err != nil {
+			return 0, err
+		}
+	}
+	return len(pendings), nil
 }
 
 func ExtractHashtags(text string) []string {
@@ -98,9 +165,16 @@ func (s *Store) Create(text string, createdAt time.Time, automated bool) (*Entry
 	}
 	defer tx.Rollback()
 
+	entry := &Entry{
+		Text:      text,
+		CreatedAt: createdAt,
+		Automated: automated,
+	}
+	hash := EntryHash(entry, s.tz)
+
 	res, err := tx.Exec(
-		`INSERT INTO entries(text, created_at, automated) VALUES(?, ?, ?)`,
-		text, createdAt.UTC().Format(time.RFC3339Nano), boolInt(automated),
+		`INSERT INTO entries(text, created_at, automated, entry_hash) VALUES(?, ?, ?, ?)`,
+		text, createdAt.UTC().Format(time.RFC3339Nano), boolInt(automated), hash,
 	)
 	if err != nil {
 		return nil, err
@@ -114,13 +188,9 @@ func (s *Store) Create(text string, createdAt time.Time, automated bool) (*Entry
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return &Entry{
-		ID:        id,
-		Text:      text,
-		CreatedAt: createdAt,
-		Automated: automated,
-		Hashtags:  tags,
-	}, nil
+	entry.ID = id
+	entry.Hashtags = tags
+	return entry, nil
 }
 
 func insertTags(tx *sql.Tx, id int64, tags []string) error {
@@ -185,9 +255,19 @@ func (s *Store) Update(id int64, text string, now time.Time, serverTZ *time.Loca
 		return nil, ErrNotEditable
 	}
 
+	edited := now
+	updated := &Entry{
+		ID:        id,
+		Text:      text,
+		CreatedAt: createdAt,
+		EditedAt:  &edited,
+		Automated: automated != 0,
+	}
+	newHash := EntryHash(updated, s.tz)
+
 	_, err = tx.Exec(
-		`UPDATE entries SET text = ?, edited_at = ? WHERE id = ?`,
-		text, now.UTC().Format(time.RFC3339Nano), id,
+		`UPDATE entries SET text = ?, edited_at = ?, entry_hash = ? WHERE id = ?`,
+		text, now.UTC().Format(time.RFC3339Nano), newHash, id,
 	)
 	if err != nil {
 		return nil, err
@@ -202,15 +282,8 @@ func (s *Store) Update(id int64, text string, now time.Time, serverTZ *time.Loca
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	edited := now
-	return &Entry{
-		ID:        id,
-		Text:      text,
-		CreatedAt: createdAt,
-		EditedAt:  &edited,
-		Automated: automated != 0,
-		Hashtags:  tags,
-	}, nil
+	updated.Hashtags = tags
+	return updated, nil
 }
 
 func (s *Store) Delete(id int64, now time.Time, serverTZ *time.Location) error {
