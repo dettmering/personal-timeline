@@ -288,21 +288,18 @@ func (s *Store) Update(id int64, text string, now time.Time, serverTZ *time.Loca
 
 func (s *Store) Delete(id int64, now time.Time, serverTZ *time.Location) error {
 	var createdStr string
-	var automated int
-	err := s.db.QueryRow(`SELECT created_at, automated FROM entries WHERE id = ?`, id).Scan(&createdStr, &automated)
+	err := s.db.QueryRow(`SELECT created_at FROM entries WHERE id = ?`, id).Scan(&createdStr)
 	if err == sql.ErrNoRows {
 		return ErrNotFound
 	}
 	if err != nil {
 		return err
 	}
-	if automated != 0 {
-		return ErrNotDeletable
-	}
 	createdAt, err := time.Parse(time.RFC3339Nano, createdStr)
 	if err != nil {
 		return err
 	}
+	// automated entries may be deleted today but never edited; same-day rule applies to both
 	if !sameDay(createdAt.In(serverTZ), now.In(serverTZ)) {
 		return ErrNotDeletable
 	}

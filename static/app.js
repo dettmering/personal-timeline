@@ -472,6 +472,13 @@
     return isToday(state.date);
   }
 
+  function canDelete(entry) {
+    if (state.view === 'hashtag') {
+      return isSameDay(entry.created_at, todayISO());
+    }
+    return isToday(state.date);
+  }
+
   function updateCharCount(textEl, countEl) {
     const len = [...textEl.value].length;
     countEl.textContent = `${len} / 1000`;
@@ -523,25 +530,25 @@
       permaBtn.textContent = 'Permalink';
       permaBtn.addEventListener('click', () => copyPermalink(entry.id, permaBtn));
       actions.appendChild(permaBtn);
-      if (!entry.automated) {
-        const quoteBtn = document.createElement('button');
-        quoteBtn.type = 'button';
-        quoteBtn.textContent = 'Zitieren';
-        quoteBtn.addEventListener('click', () => quoteEntry(entry));
-        actions.appendChild(quoteBtn);
-        if (canEdit(entry)) {
-          const editBtn = document.createElement('button');
-          editBtn.type = 'button';
-          editBtn.textContent = 'Bearbeiten';
-          editBtn.addEventListener('click', () => openEdit(entry));
-          actions.appendChild(editBtn);
-          const delBtn = document.createElement('button');
-          delBtn.type = 'button';
-          delBtn.textContent = 'Löschen';
-          delBtn.className = 'danger';
-          delBtn.addEventListener('click', () => deleteEntry(entry.id));
-          actions.appendChild(delBtn);
-        }
+      const quoteBtn = document.createElement('button');
+      quoteBtn.type = 'button';
+      quoteBtn.textContent = 'Zitieren';
+      quoteBtn.addEventListener('click', () => quoteEntry(entry));
+      actions.appendChild(quoteBtn);
+      if (canEdit(entry)) {
+        const editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.textContent = 'Bearbeiten';
+        editBtn.addEventListener('click', () => openEdit(entry));
+        actions.appendChild(editBtn);
+      }
+      if (canDelete(entry)) {
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.textContent = 'Löschen';
+        delBtn.className = 'danger';
+        delBtn.addEventListener('click', () => deleteEntry(entry.id));
+        actions.appendChild(delBtn);
       }
       div.appendChild(actions);
 
