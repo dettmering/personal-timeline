@@ -380,6 +380,42 @@
     node.classList.add('highlighted');
   }
 
+  async function copyToClipboard(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand('copy');
+    } finally {
+      document.body.removeChild(ta);
+    }
+  }
+
+  async function copyPermalink(entryId, btn) {
+    const url = location.origin + location.pathname + '#/entry/' + entryId;
+    const orig = btn.dataset.origLabel || btn.textContent;
+    btn.dataset.origLabel = orig;
+    try {
+      await copyToClipboard(url);
+      btn.textContent = 'Kopiert!';
+      btn.classList.add('copied');
+    } catch (err) {
+      btn.textContent = 'Fehler';
+    }
+    setTimeout(() => {
+      btn.textContent = orig;
+      btn.classList.remove('copied');
+    }, 1500);
+  }
+
   async function quoteEntry(entry) {
     refCache.set(String(entry.id), entry);
     const token = '@' + entry.id;
@@ -480,9 +516,14 @@
       textDiv.innerHTML = renderText(entry.text);
       div.appendChild(textDiv);
 
+      const actions = document.createElement('div');
+      actions.className = 'entry-actions';
+      const permaBtn = document.createElement('button');
+      permaBtn.type = 'button';
+      permaBtn.textContent = 'Permalink';
+      permaBtn.addEventListener('click', () => copyPermalink(entry.id, permaBtn));
+      actions.appendChild(permaBtn);
       if (!entry.automated) {
-        const actions = document.createElement('div');
-        actions.className = 'entry-actions';
         const quoteBtn = document.createElement('button');
         quoteBtn.type = 'button';
         quoteBtn.textContent = 'Zitieren';
@@ -501,8 +542,8 @@
           delBtn.addEventListener('click', () => deleteEntry(entry.id));
           actions.appendChild(delBtn);
         }
-        div.appendChild(actions);
       }
+      div.appendChild(actions);
 
       el.timeline.appendChild(div);
     }
@@ -765,7 +806,33 @@
   attachAutocomplete(el.text);
   attachAutocomplete(el.editText);
 
-  // Initial load
-  refreshHashtags();
-  refreshVerifyStatus().then(() => loadDay());
+  function parseEntryHash() {
+    const m = location.hash.match(/^#\/entry\/(\d+)$/);
+    return m ? m[1] : null;
+  }
+
+  // Initial load: if the URL points at a permalink (#/entry/<id>), resolve it
+  // first so we don't briefly flash today's view before jumping to the target.
+  async function init() {
+    refreshHashtags();
+    await refreshVerifyStatus();
+    const refId = parseEntryHash();
+    if (refId) {
+      const data = await fetchRef(refId);
+      if (!data.missing) {
+        state.date = toISO(new Date(data.created_at));
+        await loadDay();
+        highlightEntry(refId);
+        return;
+      }
+    }
+    await loadDay();
+  }
+
+  window.addEventListener('hashchange', () => {
+    const refId = parseEntryHash();
+    if (refId) navigateToEntry(refId);
+  });
+
+  init();
 })();
