@@ -306,12 +306,12 @@ button:disabled {
 }
 
 @keyframes entry-highlight {
-  0% { box-shadow: 0 0 0 3px var(--primary); }
+  0%, 80% { box-shadow: 0 0 0 3px var(--primary); }
   100% { box-shadow: 0 0 0 0 transparent; }
 }
 
 .entry.highlighted {
-  animation: entry-highlight 1.6s ease-out;
+  animation: entry-highlight 10s ease-out;
 }
 
 .hashtag-suggestion.ref-suggestion {
