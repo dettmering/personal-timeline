@@ -527,26 +527,30 @@
       actions.className = 'entry-actions';
       const permaBtn = document.createElement('button');
       permaBtn.type = 'button';
-      permaBtn.textContent = 'Permalink';
+      permaBtn.title = 'Permalink';
+      permaBtn.innerHTML = '<i class="fa-solid fa-link"></i>';
       permaBtn.addEventListener('click', () => copyPermalink(entry.id, permaBtn));
       actions.appendChild(permaBtn);
       const quoteBtn = document.createElement('button');
       quoteBtn.type = 'button';
-      quoteBtn.textContent = 'Zitieren';
+      quoteBtn.title = 'Zitieren';
+      quoteBtn.innerHTML = '<i class="fa-solid fa-quote-right"></i>';
       quoteBtn.addEventListener('click', () => quoteEntry(entry));
       actions.appendChild(quoteBtn);
       if (canEdit(entry)) {
         const editBtn = document.createElement('button');
         editBtn.type = 'button';
-        editBtn.textContent = 'Bearbeiten';
+        editBtn.title = 'Bearbeiten';
+        editBtn.innerHTML = '<i class="fa-regular fa-pen-to-square"></i>';
         editBtn.addEventListener('click', () => openEdit(entry));
         actions.appendChild(editBtn);
       }
       if (canDelete(entry)) {
         const delBtn = document.createElement('button');
         delBtn.type = 'button';
-        delBtn.textContent = 'Löschen';
+        delBtn.title = 'Löschen';
         delBtn.className = 'danger';
+        delBtn.innerHTML = '<i class="fa-regular fa-trash-can"></i>';
         delBtn.addEventListener('click', () => deleteEntry(entry.id));
         actions.appendChild(delBtn);
       }

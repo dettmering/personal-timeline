@@ -354,20 +354,23 @@ button:disabled {
 }
 
 .entry-actions button {
-  font-size: 12px;
-  padding: 4px 10px;
+  font-size: 13px;
+  padding: 4px 7px;
   background: transparent;
   border-color: transparent;
   color: var(--muted);
+  opacity: 0.55;
 }
 
 .entry-actions button:hover {
   background: var(--bg);
   color: var(--text);
+  opacity: 1;
 }
 
 .entry-actions button.danger:hover {
   color: var(--danger);
+  opacity: 1;
 }
 
 .empty {
