@@ -40,6 +40,8 @@
   let knownHashtags = [];
   let currentSeal = null;
   let verifyStatus = null;
+  // refCache: id (string) -> entry-shaped object, or { missing: true }
+  const refCache = new Map();
 
   async function refreshVerifyStatus() {
     try {
@@ -68,7 +70,7 @@
     }
   }
 
-  function attachHashtagAutocomplete(textarea) {
+  function attachAutocomplete(textarea) {
     const wrap = document.createElement('div');
     wrap.className = 'hashtag-autocomplete-wrap';
     textarea.parentNode.insertBefore(wrap, textarea);
@@ -78,9 +80,10 @@
     box.className = 'hashtag-suggestions hidden';
     wrap.appendChild(box);
 
-    const state = { active: false, matches: [], selected: 0, start: -1 };
+    const state = { mode: null, items: [], selected: 0, start: -1 };
+    let searchSeq = 0;
 
-    function tokenAtCaret() {
+    function hashtagToken() {
       const caret = textarea.selectionStart;
       if (caret !== textarea.selectionEnd) return null;
       const before = textarea.value.slice(0, caret);
@@ -88,55 +91,108 @@
       if (!m) return null;
       const ch = before.charAt(before.length - m[0].length - 1);
       if (ch && /[\p{L}\p{N}_]/u.test(ch)) return null;
-      return { start: caret - m[0].length, prefix: m[1].toLowerCase() };
+      return { start: caret - m[0].length, query: m[1].toLowerCase() };
     }
 
-    function render() {
-      box.innerHTML = '';
-      state.matches.forEach((tag, i) => {
-        const item = document.createElement('div');
-        item.className = 'hashtag-suggestion' + (i === state.selected ? ' selected' : '');
-        item.textContent = '#' + tag;
-        item.addEventListener('mousedown', (e) => {
-          e.preventDefault();
-          commit(tag);
-        });
-        box.appendChild(item);
-      });
-      box.classList.remove('hidden');
+    function refToken() {
+      const caret = textarea.selectionStart;
+      if (caret !== textarea.selectionEnd) return null;
+      const before = textarea.value.slice(0, caret);
+      const m = before.match(/@([^\s@]*)$/);
+      if (!m) return null;
+      const ch = before.charAt(before.length - m[0].length - 1);
+      if (ch && /[\p{L}\p{N}_]/u.test(ch)) return null;
+      return { start: caret - m[0].length, query: m[1] };
     }
 
     function close() {
-      state.active = false;
-      state.matches = [];
+      state.mode = null;
+      state.items = [];
       state.selected = 0;
       state.start = -1;
       box.classList.add('hidden');
     }
 
-    function update() {
-      const tok = tokenAtCaret();
-      if (!tok) return close();
-      const matches = knownHashtags
-        .filter((t) => t.startsWith(tok.prefix) && t !== tok.prefix)
-        .slice(0, 8);
-      if (matches.length === 0) return close();
-      state.active = true;
-      state.matches = matches;
-      state.start = tok.start;
-      if (state.selected >= matches.length) state.selected = 0;
-      render();
+    function render() {
+      box.innerHTML = '';
+      state.items.forEach((item, i) => {
+        const div = document.createElement('div');
+        div.className = 'hashtag-suggestion' + (i === state.selected ? ' selected' : '');
+        if (item.kind === 'ref') {
+          div.classList.add('ref-suggestion');
+          const date = document.createElement('span');
+          date.className = 'ref-suggestion-date';
+          date.textContent = formatRefDate(item.entry.created_at);
+          const text = document.createElement('span');
+          text.className = 'ref-suggestion-text';
+          text.textContent = truncate(item.entry.text, 60);
+          div.appendChild(date);
+          div.appendChild(text);
+        } else {
+          div.textContent = '#' + item.tag;
+        }
+        div.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          commit(item);
+        });
+        box.appendChild(div);
+      });
+      box.classList.remove('hidden');
     }
 
-    function commit(tag) {
+    function commit(item) {
       const caret = textarea.selectionStart;
       const before = textarea.value.slice(0, state.start);
       const after = textarea.value.slice(caret);
-      const insert = '#' + tag + ' ';
+      const tok = item.kind === 'ref' ? '@' + item.entry.id : '#' + item.tag;
+      const needSpaceAfter = !/^\s/.test(after);
+      const insert = tok + (needSpaceAfter ? ' ' : '');
       textarea.value = before + insert + after;
       const pos = before.length + insert.length;
       textarea.setSelectionRange(pos, pos);
+      if (item.kind === 'ref') {
+        refCache.set(String(item.entry.id), item.entry);
+      }
       textarea.dispatchEvent(new Event('input'));
+      close();
+    }
+
+    async function update() {
+      const hashTok = hashtagToken();
+      if (hashTok) {
+        const matches = knownHashtags
+          .filter((t) => t.startsWith(hashTok.query) && t !== hashTok.query)
+          .slice(0, 8)
+          .map((tag) => ({ kind: 'hashtag', tag }));
+        if (matches.length === 0) return close();
+        state.mode = 'hashtag';
+        state.items = matches;
+        state.start = hashTok.start;
+        if (state.selected >= matches.length) state.selected = 0;
+        render();
+        return;
+      }
+      const refTok = refToken();
+      if (refTok) {
+        const seq = ++searchSeq;
+        let entries;
+        try {
+          const data = await api(
+            '/api/entries?q=' + encodeURIComponent(refTok.query) + '&limit=10',
+          );
+          entries = data.entries || [];
+        } catch (err) {
+          return close();
+        }
+        if (seq !== searchSeq) return; // stale response
+        if (entries.length === 0) return close();
+        state.mode = 'ref';
+        state.items = entries.map((e) => ({ kind: 'ref', entry: e }));
+        state.start = refTok.start;
+        if (state.selected >= state.items.length) state.selected = 0;
+        render();
+        return;
+      }
       close();
     }
 
@@ -150,24 +206,56 @@
     });
     textarea.addEventListener('blur', () => setTimeout(close, 120));
     textarea.addEventListener('keydown', (e) => {
-      if (!state.active) return;
+      if (!state.mode) return;
       if (e.key === 'Tab' ||
           (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey)) {
         e.preventDefault();
-        commit(state.matches[state.selected]);
+        commit(state.items[state.selected]);
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
-        state.selected = (state.selected + 1) % state.matches.length;
+        state.selected = (state.selected + 1) % state.items.length;
         render();
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        state.selected = (state.selected - 1 + state.matches.length) % state.matches.length;
+        state.selected = (state.selected - 1 + state.items.length) % state.items.length;
         render();
       } else if (e.key === 'Escape') {
         e.preventDefault();
         close();
       }
     });
+  }
+
+  function truncate(s, n) {
+    if (s.length <= n) return s;
+    return s.slice(0, n - 1).trimEnd() + '…';
+  }
+
+  function formatRefDate(iso) {
+    const d = new Date(iso);
+    const now = new Date();
+    const opts = d.getFullYear() === now.getFullYear()
+      ? { day: '2-digit', month: '2-digit' }
+      : { day: '2-digit', month: '2-digit', year: '2-digit' };
+    return d.toLocaleDateString(undefined, opts);
+  }
+
+  // insertAtCaret inserts text at the textarea's caret, focuses it, and fires
+  // an input event so the autocomplete picks the change up. Pads with single
+  // spaces on either side as needed so the inserted token is whitespace-bounded.
+  function insertAtCaret(textarea, text) {
+    textarea.focus();
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const before = textarea.value.slice(0, start);
+    const after = textarea.value.slice(end);
+    const needSpaceBefore = before.length > 0 && !/\s$/.test(before);
+    const needSpaceAfter = !/^\s/.test(after);
+    const insert = (needSpaceBefore ? ' ' : '') + text + (needSpaceAfter ? ' ' : '');
+    textarea.value = before + insert + after;
+    const pos = before.length + insert.length;
+    textarea.setSelectionRange(pos, pos);
+    textarea.dispatchEvent(new Event('input'));
   }
 
   function todayISO() {
@@ -221,9 +309,102 @@
 
   function renderText(text) {
     const esc = escapeHTML(text);
-    return esc.replace(/#([\p{L}\p{N}_]+)/gu, (_, tag) => {
+    // Hashtags first: the ref placeholder below contains `#<id>`, which would
+    // otherwise be re-matched by the hashtag regex and produce nested anchors.
+    let out = esc.replace(/#([\p{L}\p{N}_]+)/gu, (_, tag) => {
       return `<a href="#" class="hashtag" data-tag="${tag.toLowerCase()}">#${tag}</a>`;
     });
+    out = out.replace(
+      /(?<![\p{L}\p{N}_])@(\d+)(?![\p{L}\p{N}_])/gu,
+      (_m, id) => {
+        return `<a href="#" class="entry-ref" data-ref-id="${id}">↪ #${id}</a>`;
+      },
+    );
+    return out;
+  }
+
+  async function fetchRef(id) {
+    const key = String(id);
+    if (refCache.has(key)) return refCache.get(key);
+    try {
+      const data = await api('/api/entries/' + encodeURIComponent(key));
+      refCache.set(key, data);
+      return data;
+    } catch (err) {
+      const missing = { missing: true };
+      refCache.set(key, missing);
+      return missing;
+    }
+  }
+
+  function renderRefChip(link, data) {
+    link.innerHTML = '';
+    if (data.missing) {
+      link.classList.add('missing');
+      link.textContent = '↪ Eintrag gelöscht';
+      return;
+    }
+    const arrow = document.createElement('span');
+    arrow.className = 'entry-ref-arrow';
+    arrow.textContent = '↪';
+    const date = document.createElement('span');
+    date.className = 'entry-ref-date';
+    date.textContent = formatRefDate(data.created_at);
+    const txt = document.createElement('span');
+    txt.className = 'entry-ref-text';
+    txt.textContent = truncate(data.text, 80);
+    link.appendChild(arrow);
+    link.appendChild(date);
+    link.appendChild(txt);
+  }
+
+  async function resolveRefs(container) {
+    const links = container.querySelectorAll('a.entry-ref[data-ref-id]');
+    const ids = new Set();
+    links.forEach((a) => ids.add(a.dataset.refId));
+    await Promise.all(
+      [...ids].map(async (id) => {
+        const data = await fetchRef(id);
+        container.querySelectorAll(`a.entry-ref[data-ref-id="${id}"]`)
+          .forEach((a) => renderRefChip(a, data));
+      }),
+    );
+  }
+
+  function highlightEntry(id) {
+    const node = el.timeline.querySelector(`.entry[data-id="${id}"]`);
+    if (!node) return;
+    node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    node.classList.remove('highlighted');
+    void node.offsetWidth;
+    node.classList.add('highlighted');
+  }
+
+  async function quoteEntry(entry) {
+    refCache.set(String(entry.id), entry);
+    const token = '@' + entry.id;
+    if (el.editDialog.open) {
+      insertAtCaret(el.editText, token);
+      return;
+    }
+    if (state.view !== 'day' || !isToday(state.date)) {
+      state.date = todayISO();
+      await loadDay();
+    }
+    insertAtCaret(el.text, token);
+  }
+
+  async function navigateToEntry(refId) {
+    const data = await fetchRef(refId);
+    if (data.missing) return;
+    const targetDate = toISO(new Date(data.created_at));
+    if (state.view === 'day' && state.date === targetDate) {
+      highlightEntry(refId);
+      return;
+    }
+    state.date = targetDate;
+    await loadDay();
+    highlightEntry(refId);
   }
 
   async function api(path, opts = {}) {
@@ -299,25 +480,33 @@
       textDiv.innerHTML = renderText(entry.text);
       div.appendChild(textDiv);
 
-      if (canEdit(entry)) {
+      if (!entry.automated) {
         const actions = document.createElement('div');
         actions.className = 'entry-actions';
-        const editBtn = document.createElement('button');
-        editBtn.type = 'button';
-        editBtn.textContent = 'Bearbeiten';
-        editBtn.addEventListener('click', () => openEdit(entry));
-        actions.appendChild(editBtn);
-        const delBtn = document.createElement('button');
-        delBtn.type = 'button';
-        delBtn.textContent = 'Löschen';
-        delBtn.className = 'danger';
-        delBtn.addEventListener('click', () => deleteEntry(entry.id));
-        actions.appendChild(delBtn);
+        const quoteBtn = document.createElement('button');
+        quoteBtn.type = 'button';
+        quoteBtn.textContent = 'Zitieren';
+        quoteBtn.addEventListener('click', () => quoteEntry(entry));
+        actions.appendChild(quoteBtn);
+        if (canEdit(entry)) {
+          const editBtn = document.createElement('button');
+          editBtn.type = 'button';
+          editBtn.textContent = 'Bearbeiten';
+          editBtn.addEventListener('click', () => openEdit(entry));
+          actions.appendChild(editBtn);
+          const delBtn = document.createElement('button');
+          delBtn.type = 'button';
+          delBtn.textContent = 'Löschen';
+          delBtn.className = 'danger';
+          delBtn.addEventListener('click', () => deleteEntry(entry.id));
+          actions.appendChild(delBtn);
+        }
         div.appendChild(actions);
       }
 
       el.timeline.appendChild(div);
     }
+    resolveRefs(el.timeline);
   }
 
   async function loadDay() {
@@ -546,12 +735,20 @@
   });
 
   el.timeline.addEventListener('click', (e) => {
+    const ref = e.target.closest('a.entry-ref');
+    if (ref) {
+      e.preventDefault();
+      if (ref.classList.contains('missing')) return;
+      navigateToEntry(ref.dataset.refId);
+      return;
+    }
     const a = e.target.closest('a.hashtag');
     if (!a) return;
     e.preventDefault();
     const tag = a.dataset.tag;
     loadHashtag(tag);
   });
+
 
   el.sealBadge.addEventListener('click', showSealDialog);
 
@@ -565,8 +762,8 @@
     }
   });
 
-  attachHashtagAutocomplete(el.text);
-  attachHashtagAutocomplete(el.editText);
+  attachAutocomplete(el.text);
+  attachAutocomplete(el.editText);
 
   // Initial load
   refreshHashtags();

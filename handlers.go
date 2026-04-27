@@ -26,6 +26,7 @@ type API struct {
 func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/entries", a.list)
 	mux.HandleFunc("POST /api/entries", a.create)
+	mux.HandleFunc("GET /api/entries/{id}", a.getEntry)
 	mux.HandleFunc("PUT /api/entries/{id}", a.update)
 	mux.HandleFunc("DELETE /api/entries/{id}", a.delete)
 	mux.HandleFunc("GET /api/hashtags", a.hashtags)
@@ -76,6 +77,22 @@ func (a *API) list(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tz := a.serverTZ()
+
+	if _, ok := q["q"]; ok {
+		limit := 20
+		if l := q.Get("limit"); l != "" {
+			if n, err := strconv.Atoi(l); err == nil {
+				limit = n
+			}
+		}
+		entries, err := a.Store.SearchEntries(strings.TrimSpace(q.Get("q")), limit)
+		if err != nil {
+			writeErr(w, 500, err.Error())
+			return
+		}
+		writeJSON(w, 200, map[string]any{"entries": entries})
+		return
+	}
 
 	if fromStr, toStr := q.Get("from"), q.Get("to"); fromStr != "" || toStr != "" {
 		if fromStr == "" || toStr == "" {
@@ -130,6 +147,25 @@ func (a *API) list(w http.ResponseWriter, r *http.Request) {
 		"date":    day.In(tz).Format("2006-01-02"),
 		"entries": entries,
 	})
+}
+
+func (a *API) getEntry(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeErr(w, 400, "invalid id")
+		return
+	}
+	entry, err := a.Store.Get(id)
+	if errors.Is(err, ErrNotFound) {
+		writeErr(w, 404, "entry not found")
+		return
+	}
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, entry)
 }
 
 type createReq struct {

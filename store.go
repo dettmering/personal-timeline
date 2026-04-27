@@ -350,6 +350,48 @@ func (s *Store) ListByRange(from, to time.Time, tz *time.Location) ([]*Entry, er
 	return s.attachHashtags(entries)
 }
 
+// SearchEntries returns the most recent entries whose text contains query
+// (case-insensitive substring). If query is empty, the most recent entries are
+// returned. limit is clamped to [1, 50].
+func (s *Store) SearchEntries(query string, limit int) ([]*Entry, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 50 {
+		limit = 50
+	}
+	var (
+		rows *sql.Rows
+		err  error
+	)
+	if query == "" {
+		rows, err = s.db.Query(
+			`SELECT id, text, created_at, edited_at, automated FROM entries
+			 ORDER BY created_at DESC LIMIT ?`,
+			limit,
+		)
+	} else {
+		esc := strings.ReplaceAll(query, `\`, `\\`)
+		esc = strings.ReplaceAll(esc, "%", `\%`)
+		esc = strings.ReplaceAll(esc, "_", `\_`)
+		pattern := "%" + esc + "%"
+		rows, err = s.db.Query(
+			`SELECT id, text, created_at, edited_at, automated FROM entries
+			 WHERE text LIKE ? ESCAPE '\'
+			 ORDER BY created_at DESC LIMIT ?`,
+			pattern, limit,
+		)
+	}
+	if err != nil {
+		return nil, err
+	}
+	entries, err := scanEntries(rows)
+	if err != nil {
+		return nil, err
+	}
+	return s.attachHashtags(entries)
+}
+
 func (s *Store) ListByHashtag(tag string) ([]*Entry, error) {
 	rows, err := s.db.Query(
 		`SELECT e.id, e.text, e.created_at, e.edited_at, e.automated
