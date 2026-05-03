@@ -347,7 +347,7 @@ func (s *Store) recomputeDay(date string) (root []byte, count int, breakReason s
 	end := start.Add(24 * time.Hour)
 
 	rows, err := s.db.Query(
-		`SELECT id, text, created_at, automated, entry_hash FROM entries
+		`SELECT id, text, created_at, automated, lat, lon, entry_hash FROM entries
 		 WHERE created_at >= ? AND created_at < ?
 		 ORDER BY id ASC`,
 		start.UTC().Format(time.RFC3339Nano), end.UTC().Format(time.RFC3339Nano),
@@ -364,9 +364,11 @@ func (s *Store) recomputeDay(date string) (root []byte, count int, breakReason s
 			text       string
 			createdStr string
 			automated  int
+			lat        sql.NullFloat64
+			lon        sql.NullFloat64
 			storedHash []byte
 		)
-		if err := rows.Scan(&id, &text, &createdStr, &automated, &storedHash); err != nil {
+		if err := rows.Scan(&id, &text, &createdStr, &automated, &lat, &lon, &storedHash); err != nil {
 			return nil, 0, "", err
 		}
 		created, err := time.Parse(time.RFC3339Nano, createdStr)
@@ -374,6 +376,10 @@ func (s *Store) recomputeDay(date string) (root []byte, count int, breakReason s
 			return nil, 0, "", err
 		}
 		e := &Entry{ID: id, Text: text, CreatedAt: created, Automated: automated != 0}
+		if lat.Valid && lon.Valid {
+			la, lo := lat.Float64, lon.Float64
+			e.Lat, e.Lon = &la, &lo
+		}
 		recomputed := EntryHash(e, s.tz)
 		count++
 		if !bytes.Equal(recomputed, storedHash) {

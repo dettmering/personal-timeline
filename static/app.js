@@ -516,6 +516,17 @@
         meta.appendChild(edited);
       }
 
+      if (typeof entry.lat === 'number' && typeof entry.lon === 'number') {
+        const geo = document.createElement('a');
+        geo.className = 'geo-link';
+        geo.href = `https://www.openstreetmap.org/?mlat=${entry.lat}&mlon=${entry.lon}#map=16/${entry.lat}/${entry.lon}`;
+        geo.target = '_blank';
+        geo.rel = 'noopener';
+        geo.title = `${entry.lat.toFixed(6)}, ${entry.lon.toFixed(6)}`;
+        geo.innerHTML = '<i class="fa-solid fa-location-dot"></i>';
+        meta.appendChild(geo);
+      }
+
       div.appendChild(meta);
 
       const textDiv = document.createElement('div');

@@ -24,6 +24,8 @@ type Entry struct {
 	EditedAt  *time.Time `json:"edited_at,omitempty"`
 	Automated bool       `json:"automated"`
 	Hashtags  []string   `json:"hashtags"`
+	Lat       *float64   `json:"lat,omitempty"`
+	Lon       *float64   `json:"lon,omitempty"`
 }
 
 type Store struct {
@@ -98,6 +100,13 @@ CREATE TABLE IF NOT EXISTS day_seals (
 			return err
 		}
 	}
+	for _, col := range []string{"lat", "lon"} {
+		if _, err := s.db.Exec(`ALTER TABLE entries ADD COLUMN ` + col + ` REAL`); err != nil {
+			if !strings.Contains(err.Error(), "duplicate column") {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
@@ -105,7 +114,7 @@ CREATE TABLE IF NOT EXISTS day_seals (
 // Returns the number of rows updated.
 func (s *Store) BackfillHashes() (int, error) {
 	rows, err := s.db.Query(
-		`SELECT id, text, created_at, automated FROM entries WHERE entry_hash IS NULL`,
+		`SELECT id, text, created_at, automated, lat, lon FROM entries WHERE entry_hash IS NULL`,
 	)
 	if err != nil {
 		return 0, err
@@ -121,8 +130,10 @@ func (s *Store) BackfillHashes() (int, error) {
 			text       string
 			createdStr string
 			automated  int
+			lat        sql.NullFloat64
+			lon        sql.NullFloat64
 		)
-		if err := rows.Scan(&id, &text, &createdStr, &automated); err != nil {
+		if err := rows.Scan(&id, &text, &createdStr, &automated, &lat, &lon); err != nil {
 			rows.Close()
 			return 0, err
 		}
@@ -132,6 +143,10 @@ func (s *Store) BackfillHashes() (int, error) {
 			return 0, err
 		}
 		e := &Entry{ID: id, Text: text, CreatedAt: created, Automated: automated != 0}
+		if lat.Valid && lon.Valid {
+			la, lo := lat.Float64, lon.Float64
+			e.Lat, e.Lon = &la, &lo
+		}
 		pendings = append(pendings, pending{id: id, hash: EntryHash(e, s.tz)})
 	}
 	rows.Close()
@@ -158,7 +173,7 @@ func ExtractHashtags(text string) []string {
 	return out
 }
 
-func (s *Store) Create(text string, createdAt time.Time, automated bool) (*Entry, error) {
+func (s *Store) Create(text string, createdAt time.Time, automated bool, lat, lon *float64) (*Entry, error) {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return nil, err
@@ -169,12 +184,19 @@ func (s *Store) Create(text string, createdAt time.Time, automated bool) (*Entry
 		Text:      text,
 		CreatedAt: createdAt,
 		Automated: automated,
+		Lat:       lat,
+		Lon:       lon,
 	}
 	hash := EntryHash(entry, s.tz)
 
+	var latVal, lonVal any
+	if lat != nil && lon != nil {
+		latVal = *lat
+		lonVal = *lon
+	}
 	res, err := tx.Exec(
-		`INSERT INTO entries(text, created_at, automated, entry_hash) VALUES(?, ?, ?, ?)`,
-		text, createdAt.UTC().Format(time.RFC3339Nano), boolInt(automated), hash,
+		`INSERT INTO entries(text, created_at, automated, entry_hash, lat, lon) VALUES(?, ?, ?, ?, ?, ?)`,
+		text, createdAt.UTC().Format(time.RFC3339Nano), boolInt(automated), hash, latVal, lonVal,
 	)
 	if err != nil {
 		return nil, err
@@ -212,7 +234,7 @@ func insertTags(tx *sql.Tx, id int64, tags []string) error {
 
 func (s *Store) Get(id int64) (*Entry, error) {
 	row := s.db.QueryRow(
-		`SELECT id, text, created_at, edited_at, automated FROM entries WHERE id = ?`, id,
+		`SELECT id, text, created_at, edited_at, automated, lat, lon FROM entries WHERE id = ?`, id,
 	)
 	e, err := scanEntryRow(row)
 	if err != nil {
@@ -235,9 +257,10 @@ func (s *Store) Update(id int64, text string, now time.Time, serverTZ *time.Loca
 
 	var createdStr string
 	var automated int
+	var lat, lon sql.NullFloat64
 	err = tx.QueryRow(
-		`SELECT created_at, automated FROM entries WHERE id = ?`, id,
-	).Scan(&createdStr, &automated)
+		`SELECT created_at, automated, lat, lon FROM entries WHERE id = ?`, id,
+	).Scan(&createdStr, &automated, &lat, &lon)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}
@@ -262,6 +285,10 @@ func (s *Store) Update(id int64, text string, now time.Time, serverTZ *time.Loca
 		CreatedAt: createdAt,
 		EditedAt:  &edited,
 		Automated: automated != 0,
+	}
+	if lat.Valid && lon.Valid {
+		la, lo := lat.Float64, lon.Float64
+		updated.Lat, updated.Lon = &la, &lo
 	}
 	newHash := EntryHash(updated, s.tz)
 
@@ -312,7 +339,7 @@ func (s *Store) ListByDay(day time.Time, tz *time.Location) ([]*Entry, error) {
 	start := time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, tz)
 	end := start.Add(24 * time.Hour)
 	rows, err := s.db.Query(
-		`SELECT id, text, created_at, edited_at, automated FROM entries
+		`SELECT id, text, created_at, edited_at, automated, lat, lon FROM entries
 		 WHERE created_at >= ? AND created_at < ?
 		 ORDER BY created_at DESC`,
 		start.UTC().Format(time.RFC3339Nano), end.UTC().Format(time.RFC3339Nano),
@@ -332,7 +359,7 @@ func (s *Store) ListByRange(from, to time.Time, tz *time.Location) ([]*Entry, er
 	start := time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, tz)
 	end := time.Date(to.Year(), to.Month(), to.Day(), 0, 0, 0, 0, tz).Add(24 * time.Hour)
 	rows, err := s.db.Query(
-		`SELECT id, text, created_at, edited_at, automated FROM entries
+		`SELECT id, text, created_at, edited_at, automated, lat, lon FROM entries
 		 WHERE created_at >= ? AND created_at < ?
 		 ORDER BY created_at DESC`,
 		start.UTC().Format(time.RFC3339Nano), end.UTC().Format(time.RFC3339Nano),
@@ -363,7 +390,7 @@ func (s *Store) SearchEntries(query string, limit int) ([]*Entry, error) {
 	)
 	if query == "" {
 		rows, err = s.db.Query(
-			`SELECT id, text, created_at, edited_at, automated FROM entries
+			`SELECT id, text, created_at, edited_at, automated, lat, lon FROM entries
 			 ORDER BY created_at DESC LIMIT ?`,
 			limit,
 		)
@@ -373,7 +400,7 @@ func (s *Store) SearchEntries(query string, limit int) ([]*Entry, error) {
 		esc = strings.ReplaceAll(esc, "_", `\_`)
 		pattern := "%" + esc + "%"
 		rows, err = s.db.Query(
-			`SELECT id, text, created_at, edited_at, automated FROM entries
+			`SELECT id, text, created_at, edited_at, automated, lat, lon FROM entries
 			 WHERE text LIKE ? ESCAPE '\'
 			 ORDER BY created_at DESC LIMIT ?`,
 			pattern, limit,
@@ -391,7 +418,7 @@ func (s *Store) SearchEntries(query string, limit int) ([]*Entry, error) {
 
 func (s *Store) ListByHashtag(tag string) ([]*Entry, error) {
 	rows, err := s.db.Query(
-		`SELECT e.id, e.text, e.created_at, e.edited_at, e.automated
+		`SELECT e.id, e.text, e.created_at, e.edited_at, e.automated, e.lat, e.lon
 		 FROM entries e
 		 INNER JOIN hashtags h ON h.entry_id = e.id
 		 WHERE h.tag = ?
@@ -488,8 +515,10 @@ func scanEntryRow(r rowScanner) (*Entry, error) {
 		createdStr string
 		editedStr  sql.NullString
 		automated  int
+		lat        sql.NullFloat64
+		lon        sql.NullFloat64
 	)
-	if err := r.Scan(&id, &text, &createdStr, &editedStr, &automated); err != nil {
+	if err := r.Scan(&id, &text, &createdStr, &editedStr, &automated, &lat, &lon); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, ErrNotFound
 		}
@@ -511,6 +540,10 @@ func scanEntryRow(r rowScanner) (*Entry, error) {
 		if err == nil {
 			e.EditedAt = &t
 		}
+	}
+	if lat.Valid && lon.Valid {
+		la, lo := lat.Float64, lon.Float64
+		e.Lat, e.Lon = &la, &lo
 	}
 	return e, nil
 }

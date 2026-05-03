@@ -234,6 +234,16 @@ button:disabled {
   margin-left: 8px;
 }
 
+.entry-meta .geo-link {
+  margin-left: 8px;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.entry-meta .geo-link:hover {
+  color: var(--text);
+}
+
 .entry-text {
   font-family: var(--font-serif);
   font-size: 1.375rem;

@@ -169,8 +169,10 @@ func (a *API) getEntry(w http.ResponseWriter, r *http.Request) {
 }
 
 type createReq struct {
-	Text      string `json:"text"`
-	Automated bool   `json:"automated"`
+	Text      string   `json:"text"`
+	Automated bool     `json:"automated"`
+	Lat       *float64 `json:"lat,omitempty"`
+	Lon       *float64 `json:"lon,omitempty"`
 }
 
 func (a *API) create(w http.ResponseWriter, r *http.Request) {
@@ -198,8 +200,22 @@ func (a *API) create(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 401, "invalid or missing API key")
 		return
 	}
+	if (req.Lat == nil) != (req.Lon == nil) {
+		writeErr(w, 400, "lat and lon must be provided together")
+		return
+	}
+	if req.Lat != nil {
+		if *req.Lat < -90 || *req.Lat > 90 {
+			writeErr(w, 400, "lat out of range (-90..90)")
+			return
+		}
+		if *req.Lon < -180 || *req.Lon > 180 {
+			writeErr(w, 400, "lon out of range (-180..180)")
+			return
+		}
+	}
 
-	entry, err := a.Store.Create(req.Text, time.Now(), req.Automated)
+	entry, err := a.Store.Create(req.Text, time.Now(), req.Automated, req.Lat, req.Lon)
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
