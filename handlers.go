@@ -168,11 +168,30 @@ func (a *API) getEntry(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, entry)
 }
 
+// flexFloat unmarshals JSON numbers or quoted strings into float64.
+type flexFloat struct{ V float64 }
+
+func (f *flexFloat) UnmarshalJSON(b []byte) error {
+	if len(b) > 1 && b[0] == '"' {
+		var s string
+		if err := json.Unmarshal(b, &s); err != nil {
+			return err
+		}
+		v, err := strconv.ParseFloat(strings.TrimSpace(s), 64)
+		if err != nil {
+			return err
+		}
+		f.V = v
+		return nil
+	}
+	return json.Unmarshal(b, &f.V)
+}
+
 type createReq struct {
-	Text      string   `json:"text"`
-	Automated bool     `json:"automated"`
-	Lat       *float64 `json:"lat,omitempty"`
-	Lon       *float64 `json:"lon,omitempty"`
+	Text      string     `json:"text"`
+	Automated bool       `json:"automated"`
+	Lat       *flexFloat `json:"lat,omitempty"`
+	Lon       *flexFloat `json:"lon,omitempty"`
 }
 
 func (a *API) create(w http.ResponseWriter, r *http.Request) {
@@ -205,17 +224,21 @@ func (a *API) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Lat != nil {
-		if *req.Lat < -90 || *req.Lat > 90 {
+		if req.Lat.V < -90 || req.Lat.V > 90 {
 			writeErr(w, 400, "lat out of range (-90..90)")
 			return
 		}
-		if *req.Lon < -180 || *req.Lon > 180 {
+		if req.Lon.V < -180 || req.Lon.V > 180 {
 			writeErr(w, 400, "lon out of range (-180..180)")
 			return
 		}
 	}
 
-	entry, err := a.Store.Create(req.Text, time.Now(), req.Automated, req.Lat, req.Lon)
+	var lat, lon *float64
+	if req.Lat != nil {
+		lat, lon = &req.Lat.V, &req.Lon.V
+	}
+	entry, err := a.Store.Create(req.Text, time.Now(), req.Automated, lat, lon)
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
