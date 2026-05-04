@@ -17,6 +17,7 @@ func main() {
 	addr := getenv("LISTEN_ADDR", ":8080")
 	apiKey := os.Getenv("API_KEY")
 	webhookURL := os.Getenv("WEBHOOK_URL")
+	encKey := os.Getenv("ENCRYPTION_KEY")
 	tz := loadTZ()
 
 	store, err := OpenStore(dbPath, tz)
@@ -25,12 +26,33 @@ func main() {
 	}
 	defer store.Close()
 
+	encOn := false
+	if encKey != "" {
+		c, err := NewCipher(encKey)
+		if err != nil {
+			log.Fatalf("encryption key: %v", err)
+		}
+		store.SetCipher(c)
+		encOn = true
+	}
+
+	// Order matters: hashes must exist before encrypting, since entry_hash is the AAD.
 	n, err := store.BackfillHashes()
 	if err != nil {
 		log.Fatalf("backfill hashes: %v", err)
 	}
 	if n > 0 {
 		log.Printf("backfilled entry_hash for %d existing rows", n)
+	}
+
+	if encOn {
+		m, err := store.EncryptBackfill()
+		if err != nil {
+			log.Fatalf("encrypt backfill: %v", err)
+		}
+		if m > 0 {
+			log.Printf("encrypted %d existing rows", m)
+		}
 	}
 
 	mux := http.NewServeMux()
@@ -47,7 +69,11 @@ func main() {
 	go sealLoop(api)
 	go upgradeOTSLoop(api)
 
-	log.Printf("listening on %s (db=%s, tz=%s)", addr, dbPath, tz)
+	encStr := "off"
+	if encOn {
+		encStr = "on"
+	}
+	log.Printf("listening on %s (db=%s, tz=%s, encryption=%s)", addr, dbPath, tz, encStr)
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatal(err)
 	}

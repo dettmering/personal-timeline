@@ -23,6 +23,7 @@ Es soll eine Microsite entwickelt werden, die es mir erlaubt, ein Logbuch über 
 - Der Siegel-Hash eines jeden Tages soll bei einem externen Zeitstempel-Dienst (OpenTimestamps) hinterlegt werden, so dass unabhängig vom Server belegt werden kann, dass der Siegel-Hash zu einem bestimmten Zeitpunkt existierte. Der resultierende `.ots`-Proof muss exportierbar sein.
 - Es soll einen Endpoint zur Verifikation der gesamten Kette geben, der den ersten Bruch samt Grund (Eintrag manipuliert, Eintrag entfernt, Merkle-Root inkonsistent, Chain-Bruch) meldet.
 - Im Frontend soll an vergangenen Tagen ein Hinweis auf die Versiegelung sichtbar sein, über den die Siegel-Details und der `.ots`-Proof heruntergeladen werden können.
+- Die Eintragstexte sowie optional vorhandene Geo-Koordinaten sollen at-rest in der Datenbank symmetrisch verschlüsselt sein. Der Schlüssel wird per Env-Var (`ENCRYPTION_KEY`) als base64-kodierter 32-Byte-Wert übergeben. Ist die Variable gesetzt, werden neue Einträge verschlüsselt geschrieben und bestehende Klartext-Einträge beim Start einmalig migriert. Die kanonischen Eintrags-Hashes (`entry_hash`) werden weiterhin auf dem Klartext berechnet und beim Migrieren nicht verändert, damit die Versiegelungs-Kette und die OpenTimestamps-Anker unverändert gültig bleiben. Die Verschlüsselung deckt das Bedrohungsmodell „DB-File leakt" ab; API-Antworten an authentifizierte Clients und das Frontend bleiben Klartext. Hashtags werden bewusst weiterhin als Klartext indiziert, damit Tag-Filterung effizient bleibt.
 
 # Technische Anforderungen
 

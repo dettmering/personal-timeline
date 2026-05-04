@@ -347,7 +347,7 @@ func (s *Store) recomputeDay(date string) (root []byte, count int, breakReason s
 	end := start.Add(24 * time.Hour)
 
 	rows, err := s.db.Query(
-		`SELECT id, text, created_at, automated, lat, lon, entry_hash FROM entries
+		`SELECT id, text, text_cipher, created_at, automated, lat, lon, geo_cipher, entry_hash FROM entries
 		 WHERE created_at >= ? AND created_at < ?
 		 ORDER BY id ASC`,
 		start.UTC().Format(time.RFC3339Nano), end.UTC().Format(time.RFC3339Nano),
@@ -362,13 +362,15 @@ func (s *Store) recomputeDay(date string) (root []byte, count int, breakReason s
 		var (
 			id         int64
 			text       string
+			textCipher []byte
 			createdStr string
 			automated  int
 			lat        sql.NullFloat64
 			lon        sql.NullFloat64
+			geoCipher  []byte
 			storedHash []byte
 		)
-		if err := rows.Scan(&id, &text, &createdStr, &automated, &lat, &lon, &storedHash); err != nil {
+		if err := rows.Scan(&id, &text, &textCipher, &createdStr, &automated, &lat, &lon, &geoCipher, &storedHash); err != nil {
 			return nil, 0, "", err
 		}
 		created, err := time.Parse(time.RFC3339Nano, createdStr)
@@ -376,7 +378,32 @@ func (s *Store) recomputeDay(date string) (root []byte, count int, breakReason s
 			return nil, 0, "", err
 		}
 		e := &Entry{ID: id, Text: text, CreatedAt: created, Automated: automated != 0}
-		if lat.Valid && lon.Valid {
+		// Decrypt text and geo back to plaintext so EntryHash works on the same
+		// bytes that were originally hashed at create time.
+		if textCipher != nil {
+			if s.cipher == nil {
+				return nil, count, fmt.Sprintf("entry %d encrypted but no key configured", id), nil
+			}
+			pt, err := s.cipher.Decrypt(textCipher, storedHash)
+			if err != nil {
+				return nil, count, fmt.Sprintf("entry %d text decrypt failed: %v", id, err), nil
+			}
+			e.Text = string(pt)
+		}
+		if geoCipher != nil {
+			if s.cipher == nil {
+				return nil, count, fmt.Sprintf("entry %d geo encrypted but no key configured", id), nil
+			}
+			raw, err := s.cipher.Decrypt(geoCipher, storedHash)
+			if err != nil {
+				return nil, count, fmt.Sprintf("entry %d geo decrypt failed: %v", id, err), nil
+			}
+			la, lo, err := decodeGeo(raw)
+			if err != nil {
+				return nil, count, fmt.Sprintf("entry %d geo decode: %v", id, err), nil
+			}
+			e.Lat, e.Lon = &la, &lo
+		} else if lat.Valid && lon.Valid {
 			la, lo := lat.Float64, lon.Float64
 			e.Lat, e.Lon = &la, &lo
 		}
