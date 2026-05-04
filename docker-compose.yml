@@ -8,9 +8,9 @@ services:
       - "8080:8080"
     volumes:
       - timeline-data:/data
+      - /opt/secrets/timeline-encryption-key.txt:/run/secrets/timeline_encryption_key:ro
     environment:
       TZ: Europe/Berlin
-      # API_KEY: change-me   # optional, erzwingt Bearer/X-API-Key bei automated=true
 
 volumes:
   timeline-data:

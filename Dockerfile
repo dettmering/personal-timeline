@@ -20,8 +20,9 @@ ENV DB_PATH=/data/timeline.db \
 USER app
 WORKDIR /app
 COPY --from=builder /out/timeline /app/timeline
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 
 VOLUME ["/data"]
 EXPOSE 8080
 
-ENTRYPOINT ["/app/timeline"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
