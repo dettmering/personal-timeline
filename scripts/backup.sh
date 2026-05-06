@@ -12,10 +12,9 @@ mkdir -p "$BACKUP_DIR"
 
 # SQLite online backup via .backup command — safe while the DB is in use
 docker run --rm \
-  -v "${VOLUME}:/data:ro" \
+  -v "${VOLUME}:/data" \
   -v "$BACKUP_DIR:/backup" \
-  alpine/sqlite \
-  sqlite3 "$DB_PATH" ".backup /backup/tmp_backup.db"
+  alpine/sqlite "$DB_PATH" ".backup /backup/tmp_backup.db"
 
 gzip -9 -c "$BACKUP_DIR/tmp_backup.db" > "$DEST"
 rm -f "$BACKUP_DIR/tmp_backup.db"
