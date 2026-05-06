@@ -11,18 +11,20 @@ on:
 jobs:
   build:
     runs-on: docker
-    container:
-      image: golang:1.22-alpine
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Build
-        env:
-          CGO_ENABLED: "0"
-          GOOS: linux
-          GOARCH: amd64
-        run: go build -ldflags="-s -w" -o personal-timeline .
+        run: |
+          docker run --rm \
+            -v $(pwd):/src \
+            -w /src \
+            -e CGO_ENABLED=0 \
+            -e GOOS=linux \
+            -e GOARCH=amd64 \
+            golang:1.22-alpine \
+            go build -ldflags="-s -w" -o personal-timeline .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
