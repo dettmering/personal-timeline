@@ -1,11 +1,6 @@
 name: Build Go Binary
 
 on:
-  push:
-    branches:
-      - master
-    tags:
-      - '*'
   workflow_dispatch:
 
 jobs:
