@@ -1,0 +1,31 @@
+name: Build Go Binary
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - '*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: docker
+    container:
+      image: golang:1.22-alpine
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build
+        env:
+          CGO_ENABLED: "0"
+          GOOS: linux
+          GOARCH: amd64
+        run: go build -ldflags="-s -w" -o personal-timeline .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: personal-timeline-linux-amd64
+          path: personal-timeline
