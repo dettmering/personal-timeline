@@ -5,6 +5,11 @@
     hashtag: null,
   };
 
+  {
+    const dq = new URLSearchParams(location.search).get('date');
+    if (dq && /^\d{4}-\d{2}-\d{2}$/.test(dq)) state.date = dq;
+  }
+
   const el = {
     text: document.getElementById('text'),
     charCount: document.getElementById('charCount'),

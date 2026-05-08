@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Personal Timeline – Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Sans:ital,wght@0,400;0,600;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin="">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="container dashboard">
+    <header class="dashboard-header">
+      <h1>Dashboard</h1>
+      <a class="dashboard-back" href="/">&larr; zur Timeline</a>
+    </header>
+
+    <section class="dashboard-controls">
+      <label>Von <input type="date" id="fromPicker"></label>
+      <label>Bis <input type="date" id="toPicker"></label>
+      <button id="applyBtn" type="button" class="primary">Anwenden</button>
+      <div class="dashboard-presets">
+        <button type="button" data-range="365">365 Tage</button>
+        <button type="button" data-range="90">90 Tage</button>
+        <button type="button" data-range="ytd">Dieses Jahr</button>
+      </div>
+    </section>
+
+    <section class="dashboard-summary" id="summary"></section>
+
+    <section class="dashboard-section">
+      <h2>Heatmap</h2>
+      <div class="heatmap-wrap">
+        <div class="heatmap-weekdays" aria-hidden="true">
+          <span></span><span>Mo</span><span></span><span>Mi</span><span></span><span>Fr</span><span></span>
+        </div>
+        <div id="heatmap" class="heatmap"></div>
+      </div>
+      <div class="heatmap-legend">
+        <span>weniger</span>
+        <span class="cell intensity-0"></span>
+        <span class="cell intensity-1"></span>
+        <span class="cell intensity-2"></span>
+        <span class="cell intensity-3"></span>
+        <span class="cell intensity-4"></span>
+        <span>mehr</span>
+      </div>
+    </section>
+
+    <section class="dashboard-section">
+      <h2>Karte</h2>
+      <div id="map" class="dashboard-map"></div>
+      <p id="mapEmpty" class="empty hidden">Keine Einträge mit Geo-Koordinaten in diesem Zeitraum.</p>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+          crossorigin=""></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>

@@ -38,6 +38,17 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/seals/{date}", a.getSeal)
 	mux.HandleFunc("GET /api/seals/{date}/proof.ots", a.getSealProof)
 	mux.HandleFunc("POST /api/seals/{date}", a.triggerSeal)
+	mux.HandleFunc("GET /dashboard", a.dashboardHTML)
+}
+
+func (a *API) dashboardHTML(w http.ResponseWriter, r *http.Request) {
+	b, err := staticFiles.ReadFile("static/dashboard.html")
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write(b)
 }
 
 func (a *API) hashtags(w http.ResponseWriter, r *http.Request) {
