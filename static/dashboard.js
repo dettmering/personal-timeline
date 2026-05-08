@@ -8,6 +8,15 @@
     map: document.getElementById('map'),
     mapEmpty: document.getElementById('mapEmpty'),
     summary: document.getElementById('summary'),
+    legendMin: document.getElementById('legendMin'),
+    legendMax: document.getElementById('legendMax'),
+    legendBuckets: [
+      document.getElementById('legendBucket0'),
+      document.getElementById('legendBucket1'),
+      document.getElementById('legendBucket2'),
+      document.getElementById('legendBucket3'),
+      document.getElementById('legendBucket4'),
+    ],
   };
 
   let map = null;
@@ -70,12 +79,26 @@
     return m;
   }
 
-  function intensity(count) {
-    if (count <= 0) return 0;
-    if (count <= 2) return 1;
-    if (count <= 4) return 2;
-    if (count <= 7) return 3;
-    return 4;
+  function intensity(count, max) {
+    if (count <= 0 || max <= 0) return 0;
+    return Math.min(4, Math.ceil((count / max) * 4));
+  }
+
+  function bucketStart(k, max) {
+    return Math.floor(((k - 1) * max) / 4) + 1;
+  }
+
+  function updateLegend(max) {
+    el.legendMin.textContent = '0';
+    el.legendMax.textContent = String(max);
+    el.legendBuckets[0].title = '0 Einträge';
+    for (let k = 1; k <= 4; k++) {
+      const a = bucketStart(k, max);
+      const b = k === 4 ? max : bucketStart(k + 1, max) - 1;
+      el.legendBuckets[k].title = max <= 0
+        ? '–'
+        : (a === b ? a + ' Einträge' : a + '–' + b + ' Einträge');
+    }
   }
 
   function renderHeatmap(from, to, byDay) {
@@ -91,6 +114,10 @@
     const weeks = Math.ceil(totalDays / 7);
     el.heatmap.style.gridTemplateColumns = 'repeat(' + weeks + ', 12px)';
 
+    let max = 0;
+    for (const v of byDay.values()) if (v > max) max = v;
+    updateLegend(max);
+
     let monthLabel = -1;
     for (let w = 0; w < weeks; w++) {
       for (let r = 0; r < 7; r++) {
@@ -103,7 +130,7 @@
           cell.classList.add('outside');
         } else {
           const c = byDay.get(iso) || 0;
-          cell.classList.add('intensity-' + intensity(c));
+          cell.classList.add('intensity-' + intensity(c, max));
           cell.title = iso + ' — ' + c + (c === 1 ? ' Eintrag' : ' Einträge');
           cell.style.cursor = 'pointer';
           cell.addEventListener('click', () => {

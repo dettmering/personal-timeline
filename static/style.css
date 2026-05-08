@@ -650,13 +650,14 @@ button:disabled {
   height: 12px;
   border-radius: 2px;
   background: var(--auto-bg);
+  display: inline-block;
 }
 .heatmap .cell.outside { background: transparent; }
-.heatmap .cell.intensity-0 { background: var(--auto-bg); }
-.heatmap .cell.intensity-1 { background: #f5c1ac; }
-.heatmap .cell.intensity-2 { background: #ec9876; }
-.heatmap .cell.intensity-3 { background: #d97757; }
-.heatmap .cell.intensity-4 { background: #a04d2f; }
+.cell.intensity-0 { background: var(--auto-bg); }
+.cell.intensity-1 { background: #f5c1ac; }
+.cell.intensity-2 { background: #ec9876; }
+.cell.intensity-3 { background: #d97757; }
+.cell.intensity-4 { background: #a04d2f; }
 
 .heatmap-legend {
   display: flex;
