@@ -88,6 +88,44 @@
     return Math.floor(((k - 1) * max) / 4) + 1;
   }
 
+  function fitHeatmap(weeks) {
+    const wrap = el.heatmap.parentElement;
+    if (!wrap) return;
+    const wrapStyle = getComputedStyle(wrap);
+    const padX = parseFloat(wrapStyle.paddingLeft) + parseFloat(wrapStyle.paddingRight);
+    const wrapGap = parseFloat(wrapStyle.gap || wrapStyle.columnGap) || 0;
+    const labels = wrap.querySelector('.heatmap-weekdays');
+    const labelW = labels ? labels.getBoundingClientRect().width : 0;
+    const innerW = wrap.clientWidth - padX - wrapGap - labelW;
+    if (innerW <= 0 || weeks <= 0) return;
+    const cellGap = 3;
+    const fit = Math.floor((innerW - (weeks - 1) * cellGap) / weeks);
+    const size = Math.max(8, Math.min(20, fit));
+    wrap.style.setProperty('--cell-size', size + 'px');
+  }
+
+  let resizeObserver = null;
+  function ensureResizeObserver() {
+    if (resizeObserver) return;
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', () => {
+        const w = parseInt(el.heatmap.dataset.weeks || '0', 10);
+        if (w > 0) fitHeatmap(w);
+      });
+      resizeObserver = true;
+      return;
+    }
+    let raf = 0;
+    resizeObserver = new ResizeObserver(() => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const w = parseInt(el.heatmap.dataset.weeks || '0', 10);
+        if (w > 0) fitHeatmap(w);
+      });
+    });
+    resizeObserver.observe(el.heatmap.parentElement);
+  }
+
   function updateLegend(max) {
     el.legendMin.textContent = '0';
     el.legendMax.textContent = String(max);
@@ -112,7 +150,9 @@
     el.heatmap.innerHTML = '';
     const totalDays = Math.round((end - start) / 86400000) + 1;
     const weeks = Math.ceil(totalDays / 7);
-    el.heatmap.style.gridTemplateColumns = 'repeat(' + weeks + ', 12px)';
+    el.heatmap.style.gridTemplateColumns = 'repeat(' + weeks + ', var(--cell-size, 12px))';
+    el.heatmap.dataset.weeks = String(weeks);
+    fitHeatmap(weeks);
 
     let max = 0;
     for (const v of byDay.values()) if (v > max) max = v;
@@ -246,6 +286,7 @@
   el.to.addEventListener('keydown', (e) => { if (e.key === 'Enter') setRange(el.from.value, el.to.value); });
 
   // Init
+  ensureResizeObserver();
   const r = readRange();
   el.from.value = r.from;
   el.to.value = r.to;
