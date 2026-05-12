@@ -581,15 +581,18 @@ func (s *Store) SearchEntries(query string, limit int) ([]*Entry, error) {
 	return s.attachHashtags(out)
 }
 
-func (s *Store) ListByHashtag(tag string) ([]*Entry, error) {
-	rows, err := s.db.Query(
-		`SELECT `+entryColumns+`
+func (s *Store) ListByHashtag(tag string, limit int) ([]*Entry, error) {
+	query := `SELECT ` + entryColumns + `
 		 FROM entries
 		 INNER JOIN hashtags h ON h.entry_id = entries.id
 		 WHERE h.tag = ?
-		 ORDER BY entries.created_at DESC`,
-		strings.ToLower(tag),
-	)
+		 ORDER BY entries.created_at DESC`
+	args := []any{strings.ToLower(tag)}
+	if limit > 0 {
+		query += ` LIMIT ?`
+		args = append(args, limit)
+	}
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}

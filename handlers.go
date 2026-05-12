@@ -78,7 +78,16 @@ func (a *API) serverTZ() *time.Location {
 func (a *API) list(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	if tag := strings.TrimPrefix(q.Get("hashtag"), "#"); tag != "" {
-		entries, err := a.Store.ListByHashtag(tag)
+		limit := 0
+		if l := q.Get("limit"); l != "" {
+			n, err := strconv.Atoi(l)
+			if err != nil || n < 1 {
+				writeErr(w, 400, "invalid 'limit' (expected positive integer)")
+				return
+			}
+			limit = n
+		}
+		entries, err := a.Store.ListByHashtag(tag, limit)
 		if err != nil {
 			writeErr(w, 500, err.Error())
 			return
