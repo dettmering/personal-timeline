@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-const maxTextLen = 1000
+const maxTextLen = 10000
 
 type API struct {
 	Store      *Store
@@ -232,7 +232,7 @@ func (a *API) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if utf8Len(req.Text) > maxTextLen {
-		writeErr(w, 400, "text exceeds 1000 characters")
+		writeErr(w, 400, "text exceeds 10000 characters")
 		return
 	}
 	if req.Automated && !a.checkAPIKey(r) {
@@ -318,7 +318,7 @@ func (a *API) update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if utf8Len(req.Text) > maxTextLen {
-		writeErr(w, 400, "text exceeds 1000 characters")
+		writeErr(w, 400, "text exceeds 10000 characters")
 		return
 	}
 	entry, err := a.Store.Update(id, req.Text, time.Now(), a.serverTZ())

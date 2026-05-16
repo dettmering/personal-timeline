@@ -497,8 +497,8 @@
 
   function updateCharCount(textEl, countEl) {
     const len = [...textEl.value].length;
-    countEl.textContent = `${len} / 1000`;
-    countEl.classList.toggle('over', len > 1000);
+    countEl.textContent = `${len} / 10000`;
+    countEl.classList.toggle('over', len > 10000);
   }
 
   function renderEntries(entries) {
@@ -705,8 +705,8 @@
   async function postEntry() {
     const text = el.text.value.trim();
     if (!text) return;
-    if ([...text].length > 1000) {
-      alert('Text zu lang (max. 1000 Zeichen)');
+    if ([...text].length > 10000) {
+      alert('Text zu lang (max. 10000 Zeichen)');
       return;
     }
     el.postBtn.disabled = true;
@@ -754,8 +754,8 @@
   async function saveEdit() {
     const text = el.editText.value.trim();
     if (!text) return;
-    if ([...text].length > 1000) {
-      alert('Text zu lang (max. 1000 Zeichen)');
+    if ([...text].length > 10000) {
+      alert('Text zu lang (max. 10000 Zeichen)');
       return;
     }
     try {
