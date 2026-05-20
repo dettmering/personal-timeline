@@ -327,7 +327,7 @@
     const esc = escapeHTML(text);
     // Hashtags first: the ref placeholder below contains `#<id>`, which would
     // otherwise be re-matched by the hashtag regex and produce nested anchors.
-    let out = esc.replace(/#([\p{L}\p{N}_]+)/gu, (_, tag) => {
+    let out = esc.replace(/(?<!&)#([\p{L}\p{N}_]+)/gu, (_, tag) => {
       return `<a href="#" class="hashtag" data-tag="${tag.toLowerCase()}">#${tag}</a>`;
     });
     out = out.replace(
