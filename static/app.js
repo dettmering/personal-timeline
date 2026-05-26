@@ -323,20 +323,61 @@
     }[c]));
   }
 
-  function renderText(text) {
-    const esc = escapeHTML(text);
-    // Hashtags first: the ref placeholder below contains `#<id>`, which would
-    // otherwise be re-matched by the hashtag regex and produce nested anchors.
-    let out = esc.replace(/(?<!&)#([\p{L}\p{N}_]+)/gu, (_, tag) => {
-      return `<a href="#" class="hashtag" data-tag="${tag.toLowerCase()}">#${tag}</a>`;
-    });
-    out = out.replace(
-      /(?<![\p{L}\p{N}_])@(\d+)(?![\p{L}\p{N}_])/gu,
-      (_m, id) => {
-        return `<a href="#" class="entry-ref" data-ref-id="${id}">↪ #${id}</a>`;
+  marked.use({
+    breaks: true,
+    gfm: true,
+    extensions: [
+      {
+        name: 'hashtag',
+        level: 'inline',
+        start(src) {
+          const m = src.match(/(?<![&\p{L}\p{N}_])#[\p{L}\p{N}_]/u);
+          return m != null ? m.index : undefined;
+        },
+        tokenizer(src) {
+          const match = src.match(/^#([\p{L}\p{N}_]+)/u);
+          if (!match) return;
+          return { type: 'hashtag', raw: match[0], tag: match[1] };
+        },
+        renderer(token) {
+          return `<a href="#" class="hashtag" data-tag="${token.tag.toLowerCase()}">#${escapeHTML(token.tag)}</a>`;
+        },
       },
-    );
-    return out;
+      {
+        name: 'entryRef',
+        level: 'inline',
+        start(src) {
+          const m = src.match(/(?<![\p{L}\p{N}_])@\d/u);
+          return m != null ? m.index : undefined;
+        },
+        tokenizer(src) {
+          const match = src.match(/^@(\d+)/);
+          if (!match) return;
+          return { type: 'entryRef', raw: match[0], id: match[1] };
+        },
+        renderer(token) {
+          return `<a href="#" class="entry-ref" data-ref-id="${token.id}">↪ #${token.id}</a>`;
+        },
+      },
+    ],
+    renderer: {
+      link({ href, title, tokens }) {
+        const text = this.parser.parseInline(tokens);
+        if (!/^https?:\/\//i.test(href)) return text;
+        const t = title ? ` title="${escapeHTML(title)}"` : '';
+        return `<a href="${escapeHTML(href)}" target="_blank" rel="noopener"${t}>${text}</a>`;
+      },
+      image({ href, title, text }) {
+        if (!/^https?:\/\//i.test(href)) return escapeHTML(text);
+        const t = title ? ` title="${escapeHTML(title)}"` : '';
+        return `<img src="${escapeHTML(href)}" alt="${escapeHTML(text)}"${t}>`;
+      },
+    },
+  });
+
+  function renderText(text) {
+    const safe = text.replace(/</g, '&lt;');
+    return marked.parse(safe);
   }
 
   async function fetchRef(id) {

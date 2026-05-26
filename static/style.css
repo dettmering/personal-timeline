@@ -259,8 +259,58 @@ button:disabled {
   font-family: var(--font-serif);
   font-size: 1.375rem;
   line-height: 1.45;
-  white-space: pre-wrap;
   word-break: break-word;
+}
+
+.entry-text p { margin: 0; }
+.entry-text p + p { margin-top: 0.5em; }
+
+.entry-text code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.82em;
+  background: var(--bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.entry-text pre {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  overflow-x: auto;
+  margin: 0.5em 0;
+}
+.entry-text pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.78em;
+}
+
+.entry-text blockquote {
+  border-left: 3px solid var(--primary);
+  margin: 0.5em 0;
+  padding: 0 0 0 12px;
+  color: var(--muted);
+}
+.entry-text blockquote p { margin: 0; }
+
+.entry-text ul, .entry-text ol {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+.entry-text li { margin-bottom: 0.15em; }
+.entry-text li:last-child { margin-bottom: 0; }
+
+.entry-text hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0.75em 0;
+}
+
+.entry-text img {
+  max-width: 100%;
+  border-radius: 8px;
 }
 
 .entry.automated .entry-text {
