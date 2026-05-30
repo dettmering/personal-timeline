@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -18,6 +19,8 @@ func main() {
 	apiKey := os.Getenv("API_KEY")
 	webhookURL := os.Getenv("WEBHOOK_URL")
 	encKey := os.Getenv("ENCRYPTION_KEY")
+	showPermalink := getenvBool("SHOW_PERMALINK", false)
+	showQuote := getenvBool("SHOW_QUOTE", false)
 	tz := loadTZ()
 
 	store, err := OpenStore(dbPath, tz)
@@ -57,7 +60,14 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	api := &API{Store: store, APIKey: apiKey, WebhookURL: webhookURL, TZ: tz}
+	api := &API{
+		Store:         store,
+		APIKey:        apiKey,
+		WebhookURL:    webhookURL,
+		TZ:            tz,
+		ShowPermalink: showPermalink,
+		ShowQuote:     showQuote,
+	}
 	api.Register(mux)
 
 	sub, err := fs.Sub(staticFiles, "static")
@@ -137,4 +147,17 @@ func getenv(k, def string) string {
 		return v
 	}
 	return def
+}
+
+func getenvBool(k string, def bool) bool {
+	v := os.Getenv(k)
+	if v == "" {
+		return def
+	}
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		log.Printf("invalid bool for %s=%q: %v — using default %v", k, v, err, def)
+		return def
+	}
+	return b
 }

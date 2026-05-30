@@ -45,6 +45,18 @@
   let knownHashtags = [];
   let currentSeal = null;
   let verifyStatus = null;
+  // UI feature flags from /api/config; both buttons are hidden by default.
+  const config = { show_permalink: false, show_quote: false };
+
+  async function refreshConfig() {
+    try {
+      const data = await api('/api/config');
+      config.show_permalink = !!data.show_permalink;
+      config.show_quote = !!data.show_quote;
+    } catch (err) {
+      // non-critical: keep defaults (both hidden)
+    }
+  }
   // refCache: id (string) -> entry-shaped object, or { missing: true }
   const refCache = new Map();
 
@@ -592,18 +604,22 @@
         geo.innerHTML = `<i class="fa-solid fa-location-dot"></i><span>${formatCoordsDDM(entry.lat, entry.lon)}</span>`;
         actions.appendChild(geo);
       }
-      const permaBtn = document.createElement('button');
-      permaBtn.type = 'button';
-      permaBtn.title = 'Permalink';
-      permaBtn.innerHTML = '<i class="fa-solid fa-link"></i>';
-      permaBtn.addEventListener('click', () => copyPermalink(entry.id, permaBtn));
-      actions.appendChild(permaBtn);
-      const quoteBtn = document.createElement('button');
-      quoteBtn.type = 'button';
-      quoteBtn.title = 'Zitieren';
-      quoteBtn.innerHTML = '<i class="fa-solid fa-quote-right"></i>';
-      quoteBtn.addEventListener('click', () => quoteEntry(entry));
-      actions.appendChild(quoteBtn);
+      if (config.show_permalink) {
+        const permaBtn = document.createElement('button');
+        permaBtn.type = 'button';
+        permaBtn.title = 'Permalink';
+        permaBtn.innerHTML = '<i class="fa-solid fa-link"></i>';
+        permaBtn.addEventListener('click', () => copyPermalink(entry.id, permaBtn));
+        actions.appendChild(permaBtn);
+      }
+      if (config.show_quote) {
+        const quoteBtn = document.createElement('button');
+        quoteBtn.type = 'button';
+        quoteBtn.title = 'Zitieren';
+        quoteBtn.innerHTML = '<i class="fa-solid fa-quote-right"></i>';
+        quoteBtn.addEventListener('click', () => quoteEntry(entry));
+        actions.appendChild(quoteBtn);
+      }
       if (canEdit(entry)) {
         const editBtn = document.createElement('button');
         editBtn.type = 'button';
@@ -893,6 +909,7 @@
   // first so we don't briefly flash today's view before jumping to the target.
   async function init() {
     refreshHashtags();
+    await refreshConfig();
     await refreshVerifyStatus();
     const refId = parseEntryHash();
     if (refId) {

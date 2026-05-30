@@ -17,10 +17,12 @@ import (
 const maxTextLen = 10000
 
 type API struct {
-	Store      *Store
-	APIKey     string
-	WebhookURL string
-	TZ         *time.Location
+	Store         *Store
+	APIKey        string
+	WebhookURL    string
+	TZ            *time.Location
+	ShowPermalink bool
+	ShowQuote     bool
 }
 
 func (a *API) Register(mux *http.ServeMux) {
@@ -33,6 +35,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]string{"status": "ok"})
 	})
+	mux.HandleFunc("GET /api/config", a.config)
 	mux.HandleFunc("GET /api/verify", a.verify)
 	mux.HandleFunc("GET /api/seals", a.listSeals)
 	mux.HandleFunc("GET /api/seals/{date}", a.getSeal)
@@ -49,6 +52,15 @@ func (a *API) dashboardHTML(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Write(b)
+}
+
+// config exposes UI feature flags to the frontend. Both default to false, so the
+// permalink and quote buttons stay hidden unless explicitly enabled via env.
+func (a *API) config(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, 200, map[string]bool{
+		"show_permalink": a.ShowPermalink,
+		"show_quote":     a.ShowQuote,
+	})
 }
 
 func (a *API) hashtags(w http.ResponseWriter, r *http.Request) {
