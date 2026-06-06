@@ -36,6 +36,7 @@ func (a *API) Register(mux *http.ServeMux) {
 		writeJSON(w, 200, map[string]string{"status": "ok"})
 	})
 	mux.HandleFunc("GET /api/config", a.config)
+	mux.HandleFunc("GET /api/schema", a.schema)
 	mux.HandleFunc("GET /api/verify", a.verify)
 	mux.HandleFunc("GET /api/seals", a.listSeals)
 	mux.HandleFunc("GET /api/seals/{date}", a.getSeal)
