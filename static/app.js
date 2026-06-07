@@ -1,8 +1,9 @@
 (() => {
   const state = {
-    view: 'day', // 'day' | 'hashtag'
+    view: 'day', // 'day' | 'hashtag' | 'search'
     date: todayISO(),
     hashtag: null,
+    query: '',
   };
 
   {
@@ -26,6 +27,11 @@
     filterBanner: document.getElementById('filterBanner'),
     filterTag: document.getElementById('filterTag'),
     clearFilter: document.getElementById('clearFilter'),
+    searchToggle: document.getElementById('searchToggle'),
+    searchBar: document.getElementById('searchBar'),
+    searchInput: document.getElementById('searchInput'),
+    searchCount: document.getElementById('searchCount'),
+    searchClose: document.getElementById('searchClose'),
     editDialog: document.getElementById('editDialog'),
     editForm: document.getElementById('editForm'),
     editText: document.getElementById('editText'),
@@ -571,7 +577,7 @@
       meta.className = 'entry-meta';
       const timeSpan = document.createElement('span');
       timeSpan.className = 'time';
-      if (state.view === 'hashtag') {
+      if (state.view === 'hashtag' || state.view === 'search') {
         timeSpan.textContent = formatDateTime(entry.created_at);
       } else {
         timeSpan.textContent = formatTime(entry.created_at);
@@ -642,11 +648,47 @@
       el.timeline.appendChild(div);
     }
     resolveRefs(el.timeline);
+    if (state.view === 'search' && state.query) {
+      highlightMatches(el.timeline, state.query);
+    }
+  }
+
+  // highlightMatches wraps case-insensitive occurrences of query in <mark>.
+  // It walks text nodes only (not the rendered HTML string) so markdown tags,
+  // links and HTML entities stay intact.
+  function highlightMatches(container, query) {
+    const needle = query.toLowerCase();
+    if (!needle) return;
+    for (const textDiv of container.querySelectorAll('.entry-text')) {
+      const walker = document.createTreeWalker(textDiv, NodeFilter.SHOW_TEXT);
+      const nodes = [];
+      while (walker.nextNode()) nodes.push(walker.currentNode);
+      for (const node of nodes) {
+        const text = node.nodeValue;
+        const lower = text.toLowerCase();
+        let idx = lower.indexOf(needle);
+        if (idx === -1) continue;
+        const frag = document.createDocumentFragment();
+        let pos = 0;
+        while (idx !== -1) {
+          if (idx > pos) frag.appendChild(document.createTextNode(text.slice(pos, idx)));
+          const mark = document.createElement('mark');
+          mark.textContent = text.slice(idx, idx + needle.length);
+          frag.appendChild(mark);
+          pos = idx + needle.length;
+          idx = lower.indexOf(needle, pos);
+        }
+        if (pos < text.length) frag.appendChild(document.createTextNode(text.slice(pos)));
+        node.parentNode.replaceChild(frag, node);
+      }
+    }
   }
 
   async function loadDay() {
     state.view = 'day';
     state.hashtag = null;
+    el.emptyState.textContent = 'Keine Einträge an diesem Tag.';
+    el.searchBar.classList.add('hidden');
     el.filterBanner.classList.add('hidden');
     el.dayNav.classList.remove('hidden');
     el.composer.classList.toggle('hidden', !isToday(state.date));
@@ -746,6 +788,11 @@
   async function loadHashtag(tag) {
     state.view = 'hashtag';
     state.hashtag = tag;
+    state.query = '';
+    el.emptyState.textContent = 'Keine Einträge mit diesem Hashtag.';
+    el.searchBar.classList.add('hidden');
+    el.searchInput.value = '';
+    el.searchCount.textContent = '';
     el.filterBanner.classList.remove('hidden');
     el.filterTag.textContent = `#${tag}`;
     el.dayNav.classList.add('hidden');
@@ -753,6 +800,47 @@
 
     try {
       const data = await api(`/api/entries?hashtag=${encodeURIComponent(tag)}`);
+      renderEntries(data.entries);
+    } catch (err) {
+      alert('Fehler beim Laden: ' + err.message);
+    }
+  }
+
+  function openSearch() {
+    el.searchBar.classList.remove('hidden');
+    el.searchInput.focus();
+    loadSearch(el.searchInput.value.trim());
+  }
+
+  function closeSearch() {
+    el.searchBar.classList.add('hidden');
+    el.searchInput.value = '';
+    el.searchCount.textContent = '';
+    state.query = '';
+    state.date = todayISO();
+    loadDay();
+  }
+
+  async function loadSearch(query) {
+    state.view = 'search';
+    state.query = query;
+    el.filterBanner.classList.add('hidden');
+    el.dayNav.classList.add('hidden');
+    el.composer.style.display = 'none';
+
+    if (!query) {
+      el.timeline.innerHTML = '';
+      el.searchCount.textContent = '';
+      el.emptyState.textContent = 'Suchbegriff eingeben…';
+      el.emptyState.classList.remove('hidden');
+      return;
+    }
+
+    try {
+      const data = await api(`/api/entries?q=${encodeURIComponent(query)}&limit=50`);
+      const n = data.entries.length;
+      el.searchCount.textContent = n >= 50 ? '50+ Treffer' : `${n} Treffer`;
+      el.emptyState.textContent = 'Keine Treffer.';
       renderEntries(data.entries);
     } catch (err) {
       alert('Fehler beim Laden: ' + err.message);
@@ -790,7 +878,9 @@
     if (!confirm('Eintrag wirklich löschen?')) return;
     try {
       await api(`/api/entries/${id}`, { method: 'DELETE' });
-      if (state.view === 'hashtag') {
+      if (state.view === 'search') {
+        await loadSearch(state.query);
+      } else if (state.view === 'hashtag') {
         await loadHashtag(state.hashtag);
       } else {
         await loadDay();
@@ -821,7 +911,9 @@
         body: JSON.stringify({ text }),
       });
       editingId = null;
-      if (state.view === 'hashtag') {
+      if (state.view === 'search') {
+        await loadSearch(state.query);
+      } else if (state.view === 'hashtag') {
         await loadHashtag(state.hashtag);
       } else {
         await loadDay();
@@ -867,6 +959,27 @@
   el.clearFilter.addEventListener('click', () => {
     state.date = todayISO();
     loadDay();
+  });
+
+  el.searchToggle.addEventListener('click', () => {
+    if (el.searchBar.classList.contains('hidden')) {
+      openSearch();
+    } else {
+      closeSearch();
+    }
+  });
+  el.searchClose.addEventListener('click', closeSearch);
+  let searchDebounce = null;
+  el.searchInput.addEventListener('input', () => {
+    clearTimeout(searchDebounce);
+    const q = el.searchInput.value.trim();
+    searchDebounce = setTimeout(() => loadSearch(q), 200);
+  });
+  el.searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeSearch();
+    }
   });
 
   el.timeline.addEventListener('click', (e) => {

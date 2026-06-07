@@ -20,10 +20,18 @@
           <button id="sealBadge" type="button" class="seal-badge hidden" title="Tag ist versiegelt" aria-label="Details zur Versiegelung anzeigen"></button>
           <input type="date" id="datePicker">
           <button id="todayBtn" type="button">Heute</button>
+          <button id="searchToggle" type="button" title="Suchen" aria-label="Einträge durchsuchen"><i class="fa-solid fa-magnifying-glass"></i></button>
         </div>
       </div>
       <button id="nextDay" type="button" aria-label="Nächster Tag">&rarr;</button>
     </nav>
+
+    <section class="search-bar hidden" id="searchBar">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input type="search" id="searchInput" placeholder="Einträge durchsuchen…" autocomplete="off">
+      <span id="searchCount" class="search-count"></span>
+      <button id="searchClose" type="button" aria-label="Suche schließen">&times;</button>
+    </section>
 
     <section class="filter-banner hidden" id="filterBanner">
       <span>Gefiltert nach <strong id="filterTag"></strong></span>
