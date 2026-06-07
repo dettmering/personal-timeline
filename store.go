@@ -578,6 +578,12 @@ func (s *Store) SearchEntries(query string, limit int) ([]*Entry, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	// Close the streamed rows before attachHashtags queries. With
+	// SetMaxOpenConns(1), an early `break` (limit reached) leaves these rows —
+	// and thus the single pooled connection — open, so attachHashtags' query
+	// would block forever waiting for a free connection and hang the whole
+	// service. Close is idempotent, so the deferred Close above stays harmless.
+	rows.Close()
 	return s.attachHashtags(out)
 }
 
