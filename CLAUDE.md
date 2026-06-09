@@ -14,6 +14,9 @@ Personal Timeline is a day-logging microsite (similar to Twitter/microblog) for 
 # Compile check (no go toolchain on host)
 docker run --rm -v $(pwd):/src -w /src golang:1.22-alpine go build ./...
 
+# Run the unit tests (no go toolchain on host)
+docker run --rm -v $(pwd):/src -w /src golang:1.22-alpine go test ./...
+
 # Build production binary
 docker build -t personal-timeline .
 
@@ -21,7 +24,15 @@ docker build -t personal-timeline .
 docker compose up --build
 ```
 
-No test suite or linter is configured.
+No linter is configured. Unit tests live in `*_test.go` files (`hash_test.go`, `crypto_test.go`, `seal_test.go`) and run with the command above. Both Gitea workflows (`.gitea/workflows/dockerhub.yml`, `build-binary.yml`) run `go test ./...` as a gating step before building.
+
+## Testing rules
+
+- **Every feature ships with meaningful tests.** When you add or change behavior, add tests that would actually fail if the behavior regressed — not placeholder assertions. A test that can't fail is worse than no test.
+- Prioritize the pure, security-critical logic that already has coverage: canonical hashing (`hash.go`), at-rest crypto (`crypto.go`), and the seal/merkle chain (`seal.go`). Extend those suites when you touch those areas.
+- For store-level features, use a temp-file `Store` via the `newTestStore(t)` helper pattern in `seal_test.go` (`OpenStore(filepath.Join(t.TempDir(), "test.db"), time.UTC)`); don't mock the DB.
+- Test the failure paths too (tampered ciphertext, wrong key, broken seal chain), not just the happy path. Tamper-evidence and encryption are the whole point of this project, so a green suite must prove the bad cases are caught.
+- Run `go test ./...` (in Docker, per above) before considering a change done. Don't add a feature that lowers the bar by leaving its logic untested.
 
 ## Architecture
 
