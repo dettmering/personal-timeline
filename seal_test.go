@@ -2,6 +2,7 @@ package main
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -91,6 +92,184 @@ func TestVerifyChainDetectsTamper(t *testing.T) {
 	}
 	if res.FirstBrokenDay != "2026-01-10" {
 		t.Fatalf("wrong broken day: %q (%s)", res.FirstBrokenDay, res.BreakReason)
+	}
+}
+
+func TestVerifyChainDetectsDeletedEntry(t *testing.T) {
+	s := newTestStore(t)
+	if _, err := s.Create("keep me", day(10), false, nil, nil); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if _, err := s.Create("delete me later", day(10), false, nil, nil); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if _, _, err := s.SealDay("2026-01-10"); err != nil {
+		t.Fatalf("seal: %v", err)
+	}
+
+	// Remove an entry behind the seal's back, simulating an operator erasing history.
+	if _, err := s.db.Exec(`DELETE FROM entries WHERE text = ?`, "delete me later"); err != nil {
+		t.Fatalf("tamper: %v", err)
+	}
+
+	res, err := s.VerifyChain()
+	if err != nil {
+		t.Fatalf("VerifyChain: %v", err)
+	}
+	if res.ChainOK {
+		t.Fatal("chain should be broken after deleting a sealed entry")
+	}
+	if res.FirstBrokenDay != "2026-01-10" {
+		t.Fatalf("wrong broken day: %q", res.FirstBrokenDay)
+	}
+	if !strings.Contains(res.BreakReason, "entry count changed") {
+		t.Fatalf("want count-change break, got %q", res.BreakReason)
+	}
+}
+
+func TestVerifyChainDetectsBackdatedEntry(t *testing.T) {
+	s := newTestStore(t)
+	if _, err := s.Create("original", day(10), false, nil, nil); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if _, _, err := s.SealDay("2026-01-10"); err != nil {
+		t.Fatalf("seal: %v", err)
+	}
+
+	// Inject a (correctly hashed) entry into the already-sealed day. Each entry hash
+	// verifies, but the count no longer matches what the seal committed to.
+	if _, err := s.Create("backdated", day(10), false, nil, nil); err != nil {
+		t.Fatalf("backdate: %v", err)
+	}
+
+	res, err := s.VerifyChain()
+	if err != nil {
+		t.Fatalf("VerifyChain: %v", err)
+	}
+	if res.ChainOK {
+		t.Fatal("chain should be broken after inserting into a sealed day")
+	}
+	if res.FirstBrokenDay != "2026-01-10" {
+		t.Fatalf("wrong broken day: %q", res.FirstBrokenDay)
+	}
+	if !strings.Contains(res.BreakReason, "entry count changed") {
+		t.Fatalf("want count-change break, got %q", res.BreakReason)
+	}
+}
+
+func TestVerifyChainDetectsGeoTamper(t *testing.T) {
+	s := newTestStore(t)
+	if _, err := s.Create("at a place", day(10), false, ptr(52.0), ptr(13.0)); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if _, _, err := s.SealDay("2026-01-10"); err != nil {
+		t.Fatalf("seal: %v", err)
+	}
+
+	// Move the entry's location after sealing. The v2 hash commits to lat/lon, so this
+	// must break the seal exactly like a text edit would.
+	if _, err := s.db.Exec(`UPDATE entries SET lat = ? WHERE text = ?`, 48.0, "at a place"); err != nil {
+		t.Fatalf("tamper: %v", err)
+	}
+
+	res, err := s.VerifyChain()
+	if err != nil {
+		t.Fatalf("VerifyChain: %v", err)
+	}
+	if res.ChainOK {
+		t.Fatal("chain should be broken after moving a sealed entry's coordinates")
+	}
+	if !strings.Contains(res.BreakReason, "hash mismatch") {
+		t.Fatalf("want hash-mismatch break, got %q", res.BreakReason)
+	}
+}
+
+func TestVerifyChainDetectsTamperedMerkleRoot(t *testing.T) {
+	s := newTestStore(t)
+	if _, err := s.Create("x", day(10), false, nil, nil); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if _, _, err := s.SealDay("2026-01-10"); err != nil {
+		t.Fatalf("seal: %v", err)
+	}
+
+	// Corrupt the stored merkle root directly. Entries are untouched, so re-deriving
+	// the root must disagree with the stored seal.
+	if _, err := s.db.Exec(`UPDATE day_seals SET merkle_root = ? WHERE date = ?`, []byte("not a real merkle root"), "2026-01-10"); err != nil {
+		t.Fatalf("tamper: %v", err)
+	}
+
+	res, err := s.VerifyChain()
+	if err != nil {
+		t.Fatalf("VerifyChain: %v", err)
+	}
+	if res.ChainOK {
+		t.Fatal("chain should be broken after corrupting merkle_root")
+	}
+	if !strings.Contains(res.BreakReason, "merkle_root mismatch") {
+		t.Fatalf("want merkle break, got %q", res.BreakReason)
+	}
+}
+
+func TestVerifyChainDetectsTamperedSealHash(t *testing.T) {
+	s := newTestStore(t)
+	if _, err := s.Create("x", day(10), false, nil, nil); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if _, _, err := s.SealDay("2026-01-10"); err != nil {
+		t.Fatalf("seal: %v", err)
+	}
+
+	// Rewrite the seal hash itself; it no longer matches its own components.
+	if _, err := s.db.Exec(`UPDATE day_seals SET seal_hash = ? WHERE date = ?`, []byte("forged seal hash"), "2026-01-10"); err != nil {
+		t.Fatalf("tamper: %v", err)
+	}
+
+	res, err := s.VerifyChain()
+	if err != nil {
+		t.Fatalf("VerifyChain: %v", err)
+	}
+	if res.ChainOK {
+		t.Fatal("chain should be broken after forging seal_hash")
+	}
+	if !strings.Contains(res.BreakReason, "seal_hash inconsistent") {
+		t.Fatalf("want seal_hash break, got %q", res.BreakReason)
+	}
+}
+
+func TestVerifyChainDetectsBrokenChainLink(t *testing.T) {
+	s := newTestStore(t)
+	if _, err := s.Create("d10", day(10), false, nil, nil); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if _, err := s.Create("d11", day(11), false, nil, nil); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if _, _, err := s.SealDay("2026-01-10"); err != nil {
+		t.Fatalf("seal d10: %v", err)
+	}
+	if _, _, err := s.SealDay("2026-01-11"); err != nil {
+		t.Fatalf("seal d11: %v", err)
+	}
+
+	// Sever the link from day 11 back to day 10. Even with both days internally
+	// consistent, the chain no longer ties them together.
+	if _, err := s.db.Exec(`UPDATE day_seals SET prev_seal_hash = ? WHERE date = ?`, []byte("dangling pointer"), "2026-01-11"); err != nil {
+		t.Fatalf("tamper: %v", err)
+	}
+
+	res, err := s.VerifyChain()
+	if err != nil {
+		t.Fatalf("VerifyChain: %v", err)
+	}
+	if res.ChainOK {
+		t.Fatal("chain should be broken after severing the day-to-day link")
+	}
+	if res.FirstBrokenDay != "2026-01-11" {
+		t.Fatalf("wrong broken day: %q", res.FirstBrokenDay)
+	}
+	if !strings.Contains(res.BreakReason, "prev_seal_hash does not match") {
+		t.Fatalf("want chain-link break, got %q", res.BreakReason)
 	}
 }
 
