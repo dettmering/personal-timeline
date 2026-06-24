@@ -14,7 +14,7 @@ enabled: true
 model: "opus"
 
 # Basis-Branch fuer den Agent-Branch (agent/issue-N) und den Pull Request.
-target_branch: main
+target_branch: master
 
 # Welche Phasen sind in diesem Repo erlaubt.
 phases: [plan, implement]
