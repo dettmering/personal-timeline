@@ -1,0 +1,28 @@
+# .agent.yml  -- in den Repo-Root auf den Default-Branch committen.
+#
+# Die blosse Existenz dieser Datei + enabled:true ist das Repo-Opt-in:
+# "Dieses Projekt darf der Agent ueberhaupt anfassen." Der Worker liest sie
+# nach dem Checkout direkt von der Platte (kein API-Call), also immer auf dem
+# Stand des ausgecheckten Repos.
+
+enabled: true
+
+# Pflichtfeld: Claude-Modell fuer Plan- UND Implement-Phase (ein Key fuer beide).
+# Aliase wie "sonnet", "opus", "haiku" oder volle Modell-IDs sind gueltig.
+# Fehlt der Key oder ist er leer, ueberspringt der Worker das Repo (kein Default).
+# Ein ungueltiger Wert laesst den claude-Aufruf fehlschlagen -> Lauf landet auf agent:error.
+model: "opus"
+
+# Basis-Branch fuer den Agent-Branch (agent/issue-N) und den Pull Request.
+target_branch: main
+
+# Welche Phasen sind in diesem Repo erlaubt.
+phases: [plan, implement]
+
+# Erlaubte Tools in der IMPLEMENT-Phase.
+# Die PLAN-Phase ist immer hart read-only (Read,mcp__gitea) und ignoriert das hier.
+allowed_tools: "Read,Edit,Write,Bash(git:*),mcp__gitea"
+
+# true: jedes neue Issue in diesem Repo bekommt automatisch agent:plan.
+# Wird von Node-RED ausgewertet (AUTOPLAN_REPOS), nicht vom Worker.
+auto_plan: false
