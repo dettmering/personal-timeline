@@ -1,0 +1,22 @@
+name: Run Tests only
+
+on:
+  push:
+    branches:
+      - '!master'
+
+jobs:
+  build:
+    runs-on: docker
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Test
+        run: |
+          docker run --rm \
+            -v $(pwd):/src \
+            -w /src \
+            -e CGO_ENABLED=0 \
+            golang:1.22-alpine \
+            go test ./...
