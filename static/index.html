@@ -6,43 +6,49 @@
   <title>Personal Timeline</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Sans:ital,wght@0,400;0,600;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;700&display=swap">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <main class="container">
+    <a class="brand" href="/">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="6" y1="3" x2="6" y2="21"/><circle cx="6" cy="7" r="2" fill="currentColor"/><line x1="11" y1="7" x2="20" y2="7"/><circle cx="6" cy="14" r="2" fill="currentColor"/><line x1="11" y1="14" x2="17" y2="14"/></svg>
+      TIMELINE
+    </a>
+
     <nav class="day-nav" id="dayNav">
-      <button id="prevDay" type="button" aria-label="Vorheriger Tag">&larr;</button>
-      <div class="day-center">
-        <span id="dayLabel">Heute</span>
+      <h1 id="dayLabel">Heute</h1>
+      <div class="day-meta">
+        <span id="dayMeta" class="day-meta-label"></span>
         <div class="day-controls">
-          <button id="sealBadge" type="button" class="seal-badge hidden" title="Tag ist versiegelt" aria-label="Details zur Versiegelung anzeigen"></button>
+          <button id="sealBadge" type="button" class="btn-icon seal-badge hidden" title="Tag ist versiegelt" aria-label="Details zur Versiegelung anzeigen"></button>
+          <button id="prevDay" type="button" class="btn-icon" aria-label="Vorheriger Tag" title="Vorheriger Tag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
           <input type="date" id="datePicker">
-          <button id="todayBtn" type="button">Heute</button>
-          <button id="searchToggle" type="button" title="Suchen" aria-label="Einträge durchsuchen"><i class="fa-solid fa-magnifying-glass"></i></button>
+          <button id="nextDay" type="button" class="btn-icon" aria-label="Nächster Tag" title="Nächster Tag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+          <button id="todayBtn" type="button" class="btn btn-sm">Heute</button>
+          <button id="searchToggle" type="button" class="btn-icon" title="Suchen" aria-label="Einträge durchsuchen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
         </div>
       </div>
-      <button id="nextDay" type="button" aria-label="Nächster Tag">&rarr;</button>
     </nav>
 
     <section class="search-bar hidden" id="searchBar">
-      <i class="fa-solid fa-magnifying-glass"></i>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
       <input type="search" id="searchInput" placeholder="Einträge durchsuchen…" autocomplete="off">
       <span id="searchCount" class="search-count"></span>
-      <button id="searchClose" type="button" aria-label="Suche schließen">&times;</button>
+      <button id="searchClose" type="button" class="btn-icon" aria-label="Suche schließen" title="Suche schließen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     </section>
 
     <section class="filter-banner hidden" id="filterBanner">
-      <span>Gefiltert nach <strong id="filterTag"></strong></span>
-      <button id="clearFilter" type="button">Filter entfernen</button>
+      <span class="rubric-label">Gefiltert</span>
+      <strong id="filterTag" class="rubric-range"></strong>
+      <button id="clearFilter" type="button" class="link sm rubric-end">Filter entfernen</button>
     </section>
 
     <section class="composer" id="composer">
       <textarea id="text" maxlength="10000" placeholder="Was machst du gerade? (#hashtags und @verweise werden erkannt)"></textarea>
       <div class="composer-row">
         <span id="charCount" class="char-count">0 / 10000</span>
-        <button id="postBtn" type="button">Eintrag posten</button>
+        <button id="postBtn" type="button" class="btn btn-primary">Eintrag posten</button>
       </div>
     </section>
 
@@ -55,15 +61,15 @@
       <h2>Tagesversiegelung</h2>
       <dl class="seal-details">
         <dt>Status</dt><dd id="sealStatus"></dd>
-        <dt>Datum</dt><dd id="sealDate"></dd>
-        <dt>Einträge</dt><dd id="sealCount"></dd>
-        <dt>Versiegelt am</dt><dd id="sealedAt"></dd>
+        <dt>Datum</dt><dd id="sealDate" class="mono"></dd>
+        <dt>Einträge</dt><dd id="sealCount" class="mono"></dd>
+        <dt>Versiegelt am</dt><dd id="sealedAt" class="mono"></dd>
         <dt>Seal-Hash</dt><dd><code id="sealHash"></code></dd>
         <dt>Zeitstempel</dt><dd id="sealOTS"></dd>
       </dl>
       <div class="dialog-buttons">
-        <a id="sealProofLink" href="#" download>Proof herunterladen (.ots)</a>
-        <button value="close" type="submit" class="primary">Schließen</button>
+        <a id="sealProofLink" class="link sm" href="#" download>Proof herunterladen (.ots)</a>
+        <button value="close" type="submit" class="btn btn-primary">Schließen</button>
       </div>
     </form>
   </dialog>
@@ -75,8 +81,8 @@
       <div class="composer-row">
         <span id="editCharCount" class="char-count">0 / 10000</span>
         <div class="dialog-buttons">
-          <button value="cancel" type="submit">Abbrechen</button>
-          <button value="save" type="submit" class="primary">Speichern</button>
+          <button value="cancel" type="submit" class="btn">Abbrechen</button>
+          <button value="save" type="submit" class="btn btn-primary">Speichern</button>
         </div>
       </div>
     </form>

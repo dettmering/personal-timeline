@@ -23,6 +23,7 @@
     dayLabel: document.getElementById('dayLabel'),
     datePicker: document.getElementById('datePicker'),
     dayNav: document.getElementById('dayNav'),
+    dayMeta: document.getElementById('dayMeta'),
     composer: document.getElementById('composer'),
     filterBanner: document.getElementById('filterBanner'),
     filterTag: document.getElementById('filterTag'),
@@ -311,6 +312,27 @@
     });
   }
 
+  // isoWeek returns the ISO-8601 calendar week number of a local date.
+  function isoWeek(d) {
+    const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const day = t.getUTCDay() || 7;
+    t.setUTCDate(t.getUTCDate() + 4 - day);
+    const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+    return Math.ceil(((t - yearStart) / 86400000 + 1) / 7);
+  }
+
+  // dayMetaLabel is the marginal line under the day title:
+  // relative position ("Heute", "Gestern", "Vor 5 Tagen") plus calendar week.
+  function dayMetaLabel(dateStr) {
+    const diff = Math.round((parseISO(todayISO()) - parseISO(dateStr)) / 86400000);
+    let rel;
+    if (diff === 0) rel = 'Heute';
+    else if (diff === 1) rel = 'Gestern';
+    else if (diff > 1) rel = `Vor ${diff} Tagen`;
+    else rel = 'Zukunft';
+    return `${rel} · KW ${isoWeek(parseISO(dateStr))}`;
+  }
+
   function formatTime(iso) {
     const d = new Date(iso);
     return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
@@ -476,17 +498,17 @@
 
   async function copyPermalink(entryId, btn) {
     const url = location.origin + location.pathname + '#/entry/' + entryId;
-    const orig = btn.dataset.origLabel || btn.textContent;
+    const orig = btn.dataset.origLabel || btn.innerHTML;
     btn.dataset.origLabel = orig;
     try {
       await copyToClipboard(url);
-      btn.textContent = 'Kopiert!';
+      btn.innerHTML = ICON.check;
       btn.classList.add('copied');
     } catch (err) {
       btn.textContent = 'Fehler';
     }
     setTimeout(() => {
-      btn.textContent = orig;
+      btn.innerHTML = orig;
       btn.classList.remove('copied');
     }, 1500);
   }
@@ -560,8 +582,22 @@
     countEl.classList.toggle('over', len > 10000);
   }
 
+  // Inline SVG icons in Lucide style (stroke = currentColor).
+  const svgIcon = (body) =>
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"' +
+    ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + body + '</svg>';
+  const ICON = {
+    pin: svgIcon('<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>'),
+    link: svgIcon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'),
+    quote: svgIcon('<path d="M3 21c3 0 7-1 7-8V5c0-1.25-.76-2-2-2H4c-1.25 0-2 .75-2 1.97V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .01-1 1.03V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.76-2-2-2h-4c-1.25 0-2 .75-2 1.97V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/>'),
+    edit: svgIcon('<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>'),
+    trash: svgIcon('<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'),
+    check: svgIcon('<path d="M20 6 9 17l-5-5"/>'),
+  };
+
   function renderEntries(entries) {
     el.timeline.innerHTML = '';
+    el.timeline.dataset.view = state.view;
     if (!entries || entries.length === 0) {
       el.emptyState.classList.remove('hidden');
       return;
@@ -607,14 +643,15 @@
         geo.target = '_blank';
         geo.rel = 'noopener';
         geo.title = `${entry.lat.toFixed(6)}, ${entry.lon.toFixed(6)}`;
-        geo.innerHTML = `<i class="fa-solid fa-location-dot"></i><span>${formatCoordsDDM(entry.lat, entry.lon)}</span>`;
+        geo.innerHTML = `${ICON.pin}<span>${formatCoordsDDM(entry.lat, entry.lon)}</span>`;
         actions.appendChild(geo);
       }
       if (config.show_permalink) {
         const permaBtn = document.createElement('button');
         permaBtn.type = 'button';
         permaBtn.title = 'Permalink';
-        permaBtn.innerHTML = '<i class="fa-solid fa-link"></i>';
+        permaBtn.className = 'btn-icon';
+        permaBtn.innerHTML = ICON.link;
         permaBtn.addEventListener('click', () => copyPermalink(entry.id, permaBtn));
         actions.appendChild(permaBtn);
       }
@@ -622,7 +659,8 @@
         const quoteBtn = document.createElement('button');
         quoteBtn.type = 'button';
         quoteBtn.title = 'Zitieren';
-        quoteBtn.innerHTML = '<i class="fa-solid fa-quote-right"></i>';
+        quoteBtn.className = 'btn-icon';
+        quoteBtn.innerHTML = ICON.quote;
         quoteBtn.addEventListener('click', () => quoteEntry(entry));
         actions.appendChild(quoteBtn);
       }
@@ -630,7 +668,8 @@
         const editBtn = document.createElement('button');
         editBtn.type = 'button';
         editBtn.title = 'Bearbeiten';
-        editBtn.innerHTML = '<i class="fa-regular fa-pen-to-square"></i>';
+        editBtn.className = 'btn-icon';
+        editBtn.innerHTML = ICON.edit;
         editBtn.addEventListener('click', () => openEdit(entry));
         actions.appendChild(editBtn);
       }
@@ -638,8 +677,8 @@
         const delBtn = document.createElement('button');
         delBtn.type = 'button';
         delBtn.title = 'Löschen';
-        delBtn.className = 'danger';
-        delBtn.innerHTML = '<i class="fa-regular fa-trash-can"></i>';
+        delBtn.className = 'btn-icon danger';
+        delBtn.innerHTML = ICON.trash;
         delBtn.addEventListener('click', () => deleteEntry(entry.id));
         actions.appendChild(delBtn);
       }
@@ -694,11 +733,16 @@
     el.composer.classList.toggle('hidden', !isToday(state.date));
     el.composer.style.display = isToday(state.date) ? '' : 'none';
     el.dayLabel.textContent = formatDateLong(state.date);
+    el.dayNav.classList.toggle('is-now', isToday(state.date));
+    el.dayMeta.textContent = dayMetaLabel(state.date);
     el.datePicker.value = state.date;
     el.datePicker.max = todayISO();
 
     try {
       const data = await api(`/api/entries?date=${encodeURIComponent(state.date)}`);
+      const n = (data.entries || []).length;
+      el.dayMeta.textContent = dayMetaLabel(state.date) +
+        ` · ${n} ${n === 1 ? 'Eintrag' : 'Einträge'}`;
       renderEntries(data.entries);
     } catch (err) {
       alert('Fehler beim Laden: ' + err.message);
