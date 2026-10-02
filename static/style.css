@@ -442,6 +442,10 @@ mark {
   display: grid;
   grid-template-columns: 52px minmax(0, 1fr);
   column-gap: 12px;
+  /* Time and first text line share a baseline, not a top edge: the two
+     columns mix Mono 12px and Sans 16px, so equal tops would leave the
+     smaller time floating above the text. */
+  align-items: baseline;
   padding: 14px 0 10px;
   border-bottom: 1px solid var(--border);
   border-radius: var(--radius);
@@ -453,7 +457,6 @@ mark {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding-top: 3px;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-size: 12px;
