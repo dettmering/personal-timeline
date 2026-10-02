@@ -619,23 +619,26 @@
         timeSpan.textContent = formatTime(entry.created_at);
       }
       meta.appendChild(timeSpan);
-
-      if (entry.edited_at) {
-        const edited = document.createElement('span');
-        edited.className = 'edited-mark';
-        edited.textContent = `bearbeitet ${formatTime(entry.edited_at)}`;
-        meta.appendChild(edited);
-      }
-
       div.appendChild(meta);
+
+      // Body: actions (floated to the end of the first line), text, foot.
+      const body = document.createElement('div');
+      body.className = 'entry-body';
 
       const textDiv = document.createElement('div');
       textDiv.className = 'entry-text';
       textDiv.innerHTML = renderText(entry.text);
-      div.appendChild(textDiv);
+      body.appendChild(textDiv);
 
-      const actions = document.createElement('div');
-      actions.className = 'entry-actions';
+      // Foot: edit time and place under the text, only when there is one.
+      const foot = document.createElement('div');
+      foot.className = 'entry-foot';
+      if (entry.edited_at) {
+        const edited = document.createElement('span');
+        edited.className = 'edited-mark';
+        edited.textContent = `bearbeitet ${formatTime(entry.edited_at)}`;
+        foot.appendChild(edited);
+      }
       if (typeof entry.lat === 'number' && typeof entry.lon === 'number') {
         const geo = document.createElement('a');
         geo.className = 'geo-link';
@@ -644,8 +647,12 @@
         geo.rel = 'noopener';
         geo.title = `${entry.lat.toFixed(6)}, ${entry.lon.toFixed(6)}`;
         geo.innerHTML = `${ICON.pin}<span>${formatCoordsDDM(entry.lat, entry.lon)}</span>`;
-        actions.appendChild(geo);
+        foot.appendChild(geo);
       }
+      if (foot.hasChildNodes()) body.appendChild(foot);
+
+      const actions = document.createElement('div');
+      actions.className = 'entry-actions';
       if (config.show_permalink) {
         const permaBtn = document.createElement('button');
         permaBtn.type = 'button';
@@ -682,7 +689,10 @@
         delBtn.addEventListener('click', () => deleteEntry(entry.id));
         actions.appendChild(delBtn);
       }
-      div.appendChild(actions);
+      // The float has to precede the text it sits beside. Automated entries
+      // keep it even without buttons: it carries their "auto" pill.
+      if (actions.hasChildNodes() || entry.automated) body.prepend(actions);
+      div.appendChild(body);
 
       el.timeline.appendChild(div);
     }

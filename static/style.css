@@ -431,7 +431,30 @@ mark {
 
 /* ---------- Timeline ----------
    Entries sit on the paper, not above it: no cards, no shadows, a hairline
-   between rows. The time hangs in the margin like a row index. */
+   between rows. The time hangs in the margin like a row index.
+
+   Rows are measured from the type, not from line boxes. --rhythm is the
+   space from the hairline above to the cap line of the first line, and from
+   the last baseline to the hairline below. Inter centres its caps in the
+   line box, so the leading above them is (1lh - 1cap) / 2; the padding
+   subtracts exactly that. One rule thus gives normal (16/1.6) and automated
+   (14/1.5) rows the same visible space, and every time sits the same
+   distance below its hairline. */
+
+/* Registered so `1cap`/`1lh` resolve once on .entry, against the text
+   font, and reach margin, foot and stamp as fixed lengths. Unregistered
+   (old browsers) they resolve on each child instead: the corrections
+   below become 0 and the time falls back to the shared baseline. */
+@property --text-cap {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+@property --text-lead {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
 
 .timeline {
   display: flex;
@@ -439,24 +462,30 @@ mark {
 }
 
 .entry {
+  --rhythm: 20px;
+  --text-cap: 1cap;
+  --text-lead: calc((1lh - 1cap) / 2);
   display: grid;
   grid-template-columns: 52px minmax(0, 1fr);
+  grid-template-areas: "time body";
   column-gap: 12px;
-  /* Time and first text line share a baseline, not a top edge: the two
-     columns mix Mono 12px and Sans 16px, so equal tops would leave the
-     smaller time floating above the text. */
   align-items: baseline;
-  padding: 14px 0 10px;
+  font-size: 16px;
+  line-height: 1.6;
+  padding: 13px 0;
+  padding-block: calc(var(--rhythm) - var(--text-lead));
   border-bottom: 1px solid var(--border);
   border-radius: var(--radius);
 }
 
+/* The grid puts the time on the first line's baseline, which holds for
+   whatever block opens the entry (paragraph, list, quote, heading). Lifting
+   it by the difference of the two cap heights makes the tops of the figures
+   meet the cap line: the time hangs from the top of the line. */
 .entry-meta {
-  grid-column: 1;
-  grid-row: 1 / span 2;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  grid-area: time;
+  position: relative;
+  top: calc(1cap - var(--text-cap));
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-size: 12px;
@@ -464,34 +493,29 @@ mark {
   color: var(--text-muted);
 }
 .entry-meta .time { color: var(--text-secondary); }
-.entry-meta .edited-mark {
-  font-size: 10px;
-  line-height: 1.3;
-  color: var(--text-muted);
-}
 
-/* In hashtag/search results the stamp carries a full date: put it above. */
+/* In hashtag/search results the stamp carries a full date and stands on its
+   own line above the text. Nothing to hang from here; the stamp's cap line
+   takes the place of the text's on the rhythm. */
 .timeline[data-view="hashtag"] .entry,
 .timeline[data-view="search"] .entry {
   grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "time" "body";
 }
 .timeline[data-view="hashtag"] .entry-meta,
 .timeline[data-view="search"] .entry-meta {
-  grid-row: auto;
-  flex-direction: row;
-  align-items: baseline;
-  gap: 10px;
-  padding: 0 0 4px;
+  top: 0;
+  padding-top: calc(var(--text-lead) - (1lh - 1cap) / 2);
 }
-.timeline[data-view="hashtag"] .entry-text,
-.timeline[data-view="search"] .entry-text,
-.timeline[data-view="hashtag"] .entry-actions,
-.timeline[data-view="search"] .entry-actions { grid-column: 1; }
+
+/* Body: actions (floated), text, foot. A grid item, so it contains the
+   float; its first baseline is the text's, which the time aligns to. */
+.entry-body {
+  grid-area: body;
+  min-width: 0;
+}
 
 .entry-text {
-  grid-column: 2;
-  font-size: 16px;
-  line-height: 1.6;
   color: var(--text);
   word-break: break-word;
 }
@@ -508,6 +532,7 @@ mark {
   color: var(--text);
 }
 .entry-text > :first-child { margin-top: 0; }
+.entry-text > :last-child { margin-bottom: 0; }
 
 .entry-text a { color: var(--accent); text-underline-offset: 3px; }
 .entry-text a:hover { color: var(--accent-hover); }
@@ -573,18 +598,18 @@ mark {
 }
 
 /* Automated entries are machine log lines: quieter ink, smaller, and a
-   pill that names them. */
-.entry.automated { padding: 8px 0 6px; }
-.entry.automated .entry-text {
+   pill that names them. Same rhythm as every other row: the padding
+   follows from the type size (see .entry). The pill closes the first
+   line, flush right after the actions, so it adds no height. */
+.entry.automated {
   font-size: 14px;
   line-height: 1.5;
-  color: var(--text-secondary);
 }
+.entry.automated .entry-text { color: var(--text-secondary); }
 .entry.automated .entry-meta .time { color: var(--text-muted); }
-.entry.automated .entry-meta::after {
+.entry.automated .entry-actions::after {
   content: "auto";
-  align-self: flex-start;
-  margin-top: 2px;
+  font-family: var(--font-mono);
   font-size: 9px;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -594,11 +619,6 @@ mark {
   border: 1px solid var(--border-strong);
   background: var(--surface);
   color: var(--text-muted);
-}
-.timeline[data-view="hashtag"] .entry.automated .entry-meta::after,
-.timeline[data-view="search"] .entry.automated .entry-meta::after {
-  align-self: center;
-  margin-top: 0;
 }
 
 /* @-references: a small inline reference card. */
@@ -653,15 +673,18 @@ mark {
 }
 .entry.highlighted { animation: entry-highlight 10s ease-out; }
 
-/* Actions: reserved space, revealed on hover (visibility, not display). */
+/* Actions: floated to the end of the first line and centred on it, so only
+   that line makes room; the rest of the text runs full width. Reserved
+   space, revealed on hover (visibility, not display), so nothing shifts on
+   hover and no empty toolbar row hangs under every entry. */
 .entry-actions {
-  grid-column: 2;
+  float: right;
   display: flex;
   align-items: center;
   gap: 2px;
-  justify-content: flex-end;
-  min-height: 26px;
-  margin-top: 2px;
+  margin-left: 12px;
+  height: 26px;
+  height: 1lh;
 }
 .entry-actions .btn-icon { width: 26px; height: 26px; }
 .entry-actions .btn-icon svg { width: 14px; height: 14px; }
@@ -672,25 +695,45 @@ mark {
   .entry:focus-within .entry-actions .btn-icon,
   .entry-actions .btn-icon.copied { visibility: visible; }
 }
+/* On touch the buttons are always visible: the pill goes in front of them,
+   so every row's delete button lines up at the right edge. */
+@media (hover: none) {
+  .entry.automated .entry-actions::after { order: -1; }
+}
 
-.entry-actions .geo-link {
-  margin-right: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
+/* Foot: readings that belong to the entry but are not its text (edit
+   time, place), like the date line under a task title. Measured glyph to
+   glyph as well: 12px from the last baseline to the foot's cap line, and
+   its leading is evened out against the text's so --rhythm holds below. */
+.entry-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 14px;
+  margin-top: calc(12px - var(--text-lead) - (1lh - 1cap) / 2);
+  margin-bottom: calc(var(--text-lead) - (1lh - 1cap) / 2);
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-size: 11px;
   letter-spacing: 0.01em;
   color: var(--text-muted);
+}
+
+.entry-foot .geo-link {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  color: inherit;
   text-decoration: none;
 }
-.entry-actions .geo-link svg { width: 12px; height: 12px; }
-.entry-actions .geo-link:hover { color: var(--accent); }
+.entry-foot .geo-link svg { width: 12px; height: 12px; align-self: center; }
+.entry-foot .geo-link:hover { color: var(--accent); }
 
+/* Same rhythm as an entry row (see .entry). */
 .empty {
   margin: 0;
-  padding: 14px 0;
+  padding: 12px 0;
+  padding-block: calc(20px - (1lh - 1cap) / 2);
   font-size: 14px;
   color: var(--text-muted);
   border-bottom: 1px solid var(--border);
