@@ -34,8 +34,7 @@ func (s *Store) SealDay(date string) (*DaySeal, bool, error) {
 	if err != nil {
 		return nil, false, fmt.Errorf("invalid date %q: %w", date, err)
 	}
-	start := time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, s.tz)
-	end := start.Add(24 * time.Hour)
+	start, end := dayBounds(d, s.tz)
 
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -343,8 +342,7 @@ func (s *Store) recomputeDay(date string) (root []byte, count int, breakReason s
 	if err != nil {
 		return nil, 0, "", err
 	}
-	start := time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, s.tz)
-	end := start.Add(24 * time.Hour)
+	start, end := dayBounds(d, s.tz)
 
 	rows, err := s.db.Query(
 		`SELECT id, text, text_cipher, created_at, automated, lat, lon, geo_cipher, entry_hash FROM entries

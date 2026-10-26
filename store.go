@@ -484,10 +484,17 @@ func (s *Store) Delete(id int64, now time.Time, serverTZ *time.Location) error {
 	return err
 }
 
+// dayBounds returns [start, end) of the calendar day of day in tz. The end is the
+// next local midnight, not start+24h: DST transitions make days 23 or 25 hours long.
+func dayBounds(day time.Time, tz *time.Location) (start, end time.Time) {
+	start = time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, tz)
+	end = time.Date(day.Year(), day.Month(), day.Day()+1, 0, 0, 0, 0, tz)
+	return start, end
+}
+
 // ListByDay returns entries whose created_at falls within the given calendar day in tz.
 func (s *Store) ListByDay(day time.Time, tz *time.Location) ([]*Entry, error) {
-	start := time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, tz)
-	end := start.Add(24 * time.Hour)
+	start, end := dayBounds(day, tz)
 	rows, err := s.db.Query(
 		`SELECT `+entryColumns+` FROM entries
 		 WHERE created_at >= ? AND created_at < ?
@@ -506,8 +513,8 @@ func (s *Store) ListByDay(day time.Time, tz *time.Location) ([]*Entry, error) {
 
 // ListByRange returns entries whose created_at falls within [from, to] (inclusive, calendar days in tz).
 func (s *Store) ListByRange(from, to time.Time, tz *time.Location) ([]*Entry, error) {
-	start := time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, tz)
-	end := time.Date(to.Year(), to.Month(), to.Day(), 0, 0, 0, 0, tz).Add(24 * time.Hour)
+	start, _ := dayBounds(from, tz)
+	_, end := dayBounds(to, tz)
 	rows, err := s.db.Query(
 		`SELECT `+entryColumns+` FROM entries
 		 WHERE created_at >= ? AND created_at < ?
