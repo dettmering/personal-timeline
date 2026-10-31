@@ -97,7 +97,7 @@ X-API-Key: <API_KEY>
 |---|---|---|
 | `date` | Datum | versiegelter Tag |
 | `entry_count` | Integer | Anzahl Einträge an dem Tag |
-| `merkle_root` | Base64 | Merkle-Root über die sortierten Eintrags-Hashes |
+| `merkle_root` | Base64 | `SHA-256(entry_hash₁ ‖ entry_hash₂ ‖ …)` über die Eintrags-Hashes des Tages in `id`-Reihenfolge (trotz des Namens kein Merkle-Baum) |
 | `prev_seal_hash` | Base64, optional | `seal_hash` des Vortags-Siegels; fehlt beim ersten Siegel |
 | `seal_hash` | Base64 | `SHA-256(date ‖ merkle_root ‖ prev_seal_hash)` |
 | `sealed_at` | Zeitstempel | |

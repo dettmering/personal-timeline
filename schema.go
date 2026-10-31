@@ -45,7 +45,7 @@ const schemaJSON = `{
       "fields": {
         "date": {"type": "string (YYYY-MM-DD)", "description": "The sealed calendar day in server TZ."},
         "entry_count": {"type": "integer", "description": "Number of entries on that day."},
-        "merkle_root": {"type": "string (base64 bytes)", "description": "SHA-256 Merkle root over the sorted per-entry hashes."},
+        "merkle_root": {"type": "string (base64 bytes)", "description": "SHA-256 over the concatenated per-entry hashes of the day, in entry id order (not a Merkle tree despite the name)."},
         "prev_seal_hash": {"type": "string (base64 bytes)", "optional": true, "description": "seal_hash of the previous sealed day; absent for the first seal."},
         "seal_hash": {"type": "string (base64 bytes)", "description": "SHA-256(date || merkle_root || prev_seal_hash); links the chain."},
         "sealed_at": {"type": "string (RFC3339Nano UTC)", "description": "When the seal was written."},
