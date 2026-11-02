@@ -1,4 +1,4 @@
-# Personal Timeline
+# LOG
 
 Tagebuch-Microsite zum Loggen des eigenen Tages, ähnlich einem privaten Microblog. Ein einzelnes Go-Binary mit eingebettetem Vanilla-JS-Frontend und SQLite als Speicher.
 

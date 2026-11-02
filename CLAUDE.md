@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Personal Timeline is a day-logging microsite (similar to Twitter/microblog) for personal journaling. It's a single-binary Go server with an embedded vanilla JS frontend, backed by SQLite.
+LOG is a day-logging microsite (similar to Twitter/microblog) for personal journaling. It's a single-binary Go server with an embedded vanilla JS frontend, backed by SQLite.
 
 **Usage, configuration (env vars) and the full HTTP API reference live in `README.md`.** Don't duplicate them here. When you add/change endpoints, request/response fields, status codes or env vars, update `README.md` (and `schemaJSON` in `schema.go`, see below).
 

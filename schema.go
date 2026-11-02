@@ -8,7 +8,7 @@ import "net/http"
 // the descriptions stay human/LLM-readable. Keep it in sync with the structs in
 // store.go / seal.go and the handlers in handlers.go.
 const schemaJSON = `{
-  "name": "Personal Timeline API",
+  "name": "LOG API",
   "description": "Day-logging microblog. All responses are JSON with Content-Type 'application/json; charset=utf-8'. Errors use HTTP status >= 400 with the shape {\"error\": \"<message>\"}.",
   "conventions": {
     "timestamps": "RFC3339 with nanoseconds, in UTC (suffix 'Z'), e.g. '2026-06-06T14:03:21.123456789Z'.",
@@ -19,7 +19,7 @@ const schemaJSON = `{
   },
   "objects": {
     "Entry": {
-      "description": "A single timeline post.",
+      "description": "A single LOG entry.",
       "fields": {
         "id": {"type": "integer", "description": "Unique entry id."},
         "text": {"type": "string", "description": "Post body, max 10000 characters. May contain #hashtags."},

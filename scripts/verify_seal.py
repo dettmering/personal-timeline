@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Validate a personal-timeline day-seal against its OpenTimestamps proof.
+Validate a LOG day-seal against its OpenTimestamps proof.
 
 Usage:
     verify_seal.py <date> [--api URL] [--mempool URL]
@@ -8,12 +8,12 @@ Usage:
 
 Examples:
     verify_seal.py 2026-04-30
-    verify_seal.py 2026-04-30 --api https://timeline.example.com
+    verify_seal.py 2026-04-30 --api https://log.example.com
     verify_seal.py --ots 2026-04-30.ots \\
         --seal-hash 9f3a...c1
 
 What it does:
-1. Fetches the seal metadata + .ots proof from the personal-timeline API
+1. Fetches the seal metadata + .ots proof from the LOG API
    (or reads them from disk).
 2. Confirms that the API-reported seal_hash matches the digest the .ots
    file commits to.
@@ -177,7 +177,7 @@ def fetch_block_merkle_root(height: int, mempool_base: str) -> bytes:
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("date", nargs="?", help="YYYY-MM-DD; fetches seal+proof from --api")
-    p.add_argument("--api", default="http://localhost:8080", help="personal-timeline base URL")
+    p.add_argument("--api", default="http://localhost:8080", help="LOG base URL")
     p.add_argument("--ots", help="path to a local .ots file (skips API)")
     p.add_argument("--seal-hash", help="expected seal_hash hex (required with --ots)")
     p.add_argument("--mempool", default="https://mempool.space", help="mempool.space-compatible base URL")

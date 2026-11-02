@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Export all entries from the personal-timeline SQLite database to JSON.
+Export all entries from the LOG SQLite database to JSON.
 
 Works offline — needs only the .db file (and the key if encrypted).
 
@@ -128,7 +128,7 @@ def export(db_path, key_b64, output_path):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Export personal-timeline database to JSON"
+        description="Export LOG database to JSON"
     )
     parser.add_argument("db", help="path to the SQLite database file")
     parser.add_argument("output", help="output JSON file")
